@@ -12,10 +12,6 @@ export default function Header() {
   const isHomePage = pathname === '/';
   const isConfigPage = pathname === '/config';
 
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
   return (
     <header className={styles.header}>
       <div className={styles.brand}>
@@ -26,7 +22,7 @@ export default function Header() {
       <nav className={styles.nav}>
         {isHomePage && (
           <div className={styles.tableLinks}>
-            <button onClick={scrollToTop} className={styles.tableLink}>To Process</button>
+            <a href="#to-process" className={styles.tableLink}>To Process</a>
             <a href="#done" className={styles.tableLink}>Done</a>
             <a href="#ignored" className={styles.tableLink}>Ignored</a>
           </div>
