@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSync } from '@fortawesome/free-solid-svg-icons';
+import { faSync, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import styles from './StatusPane.module.css';
 import PromptModal, { PromptType } from './PromptModal';
 import { syncAllFeeds, RssEntry } from '@/utils/rssParser';
@@ -25,9 +25,23 @@ export default function StatusPane({ onSyncComplete, onSyncStart }: StatusPanePr
   const [feedCount, setFeedCount] = useState<number>(0);
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  const [lastSyncDate, setLastSyncDate] = useState<Date | null>(null);
+  const [isSyncStale, setIsSyncStale] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [promptModalType, setPromptModalType] = useState<PromptType | null>(null);
   const [syncing, setSyncing] = useState(false);
+
+  // Check if sync is stale (more than 12 hours ago)
+  const checkSyncStale = useCallback(() => {
+    if (!lastSyncDate) {
+      setIsSyncStale(false);
+      return;
+    }
+    const now = new Date();
+    const diffMs = now.getTime() - lastSyncDate.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+    setIsSyncStale(diffHours > 12);
+  }, [lastSyncDate]);
 
   useEffect(() => {
     // Load feeds
@@ -49,14 +63,21 @@ export default function StatusPane({ onSyncComplete, onSyncStart }: StatusPanePr
     if (storedSyncTime) {
       try {
         const syncDate = new Date(storedSyncTime);
+        setLastSyncDate(syncDate);
         setLastSyncTime(syncDate.toLocaleString());
       } catch {
+        setLastSyncDate(null);
         setLastSyncTime(null);
       }
     }
 
     setMounted(true);
   }, []);
+
+  // Check stale status on mount and when lastSyncDate changes
+  useEffect(() => {
+    checkSyncStale();
+  }, [checkSyncStale]);
 
   const handleSync = async () => {
     if (feeds.length === 0) {
@@ -72,6 +93,7 @@ export default function StatusPane({ onSyncComplete, onSyncStart }: StatusPanePr
       // Update last sync time
       const now = new Date();
       localStorage.setItem(SYNC_TIME_STORAGE_KEY, now.toISOString());
+      setLastSyncDate(now);
       setLastSyncTime(now.toLocaleString());
 
       onSyncComplete?.(entries, errors);
@@ -100,6 +122,12 @@ export default function StatusPane({ onSyncComplete, onSyncStart }: StatusPanePr
             <span className={styles.label}>Last sync</span>
             <span className={styles.value}>
               {lastSyncTime || 'Never'}
+              {isSyncStale && (
+                <span className={styles.staleWarning}>
+                  <FontAwesomeIcon icon={faExclamationTriangle} />
+                  <span>&gt;12 hours ago</span>
+                </span>
+              )}
             </span>
           </div>
         </div>

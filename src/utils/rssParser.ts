@@ -187,8 +187,15 @@ function formatDate(dateStr: string): string {
  * Decode HTML entities
  */
 function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&amp;/g, '&')
+  let result = text;
+  
+  // Handle double-encoded ampersands first (e.g., &amp;amp; -> &amp; -> &)
+  // Keep decoding until no more &amp; patterns remain
+  while (result.includes('&amp;')) {
+    result = result.replace(/&amp;/g, '&');
+  }
+  
+  return result
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&apos;/g, "'")
@@ -324,8 +331,16 @@ function isRedditUrl(url: string): boolean {
 }
 
 /**
+ * Check if a URL is from Hacker News
+ */
+function isHackerNewsUrl(url: string): boolean {
+  return url.includes('news.ycombinator.com');
+}
+
+/**
  * Fetch Open Graph data for a URL
  * For Reddit URLs, skip fetching and return static Reddit branding
+ * For Hacker News URLs, skip fetching and return static HN branding
  */
 export async function fetchOgData(url: string): Promise<OpenGraphData | undefined> {
   try {
@@ -339,6 +354,15 @@ export async function fetchOgData(url: string): Promise<OpenGraphData | undefine
       return {
         ogImage: '/reddit-logo.svg',
         ogSiteName: 'Reddit',
+      };
+    }
+    
+    // Skip OG fetching for Hacker News URLs
+    // Return static HN branding instead
+    if (isHackerNewsUrl(url)) {
+      return {
+        ogImage: '/hackernews-logo.svg',
+        ogSiteName: 'Hacker News',
       };
     }
     

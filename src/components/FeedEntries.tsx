@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck, faBan, faUndo, faExternalLinkAlt, faChevronDown, faChevronUp, faSpinner, faWandMagicSparkles, faRedo, faLink } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faBan, faUndo, faExternalLinkAlt, faChevronDown, faChevronUp, faSpinner, faWandMagicSparkles, faRedo, faLink, faComment, faCodeBranch, faTrash, faBullhorn } from '@fortawesome/free-solid-svg-icons';
 import { RssEntry } from '@/utils/rssParser';
 import {
   getEntryStatus,
@@ -39,22 +39,121 @@ interface CategorizedEntries {
 /**
  * Sort entries by published date, newest first
  */
-function sortByDateDescending(entries: RssEntry[]): RssEntry[] {
-  return [...entries].sort((a, b) => {
-    // Try to parse the date strings
-    const dateA = a.publishedDate ? new Date(a.publishedDate).getTime() : 0;
-    const dateB = b.publishedDate ? new Date(b.publishedDate).getTime() : 0;
+// Descriptions that should never be considered as cross-posts
+const CROSS_POST_EXCEPTIONS = new Set([
+  'keyword was found in submission title.',
+]);
+
+/**
+ * Detect cross-posted entries (same description, different URLs)
+ * Returns a Set of descriptions that appear more than once with different URLs
+ */
+function findCrossPostDescriptions(entries: RssEntry[]): Set<string> {
+  const descriptionToUrls = new Map<string, Set<string>>();
+  
+  for (const entry of entries) {
+    const description = (entry.og?.ogDescription || entry.description || '').trim().toLowerCase();
+    if (!description) continue;
     
-    // Handle invalid dates (NaN)
-    const validA = !isNaN(dateA) ? dateA : 0;
-    const validB = !isNaN(dateB) ? dateB : 0;
+    // Skip descriptions that are in the exceptions list
+    if (CROSS_POST_EXCEPTIONS.has(description)) continue;
     
-    // Sort descending (newest first)
-    return validB - validA;
-  });
+    if (!descriptionToUrls.has(description)) {
+      descriptionToUrls.set(description, new Set());
+    }
+    if (entry.link) {
+      descriptionToUrls.get(description)!.add(entry.link);
+    }
+  }
+  
+  // Return descriptions that have multiple different URLs
+  const crossPostDescriptions = new Set<string>();
+  for (const [description, urls] of descriptionToUrls) {
+    if (urls.size > 1) {
+      crossPostDescriptions.add(description);
+    }
+  }
+  
+  return crossPostDescriptions;
 }
 
-function categorizeEntriesFromSource(entries: RssEntry[]): CategorizedEntries {
+function getEntryDate(entry: RssEntry): number {
+  const date = entry.publishedDate ? new Date(entry.publishedDate).getTime() : 0;
+  return !isNaN(date) ? date : 0;
+}
+
+function getEntryDescription(entry: RssEntry): string {
+  return (entry.og?.ogDescription || entry.description || '').trim().toLowerCase();
+}
+
+/**
+ * Sort entries by date descending, but group cross-posted articles together.
+ * Cross-post groups are positioned by their newest entry, and all entries
+ * in the group appear consecutively, sorted by date descending within the group.
+ */
+function sortWithCrossPostGrouping(entries: RssEntry[], crossPostDescriptions: Set<string>): RssEntry[] {
+  // Separate cross-posted and non-cross-posted entries
+  const crossPostGroups = new Map<string, RssEntry[]>();
+  const nonCrossPost: RssEntry[] = [];
+  
+  for (const entry of entries) {
+    const description = getEntryDescription(entry);
+    if (description && crossPostDescriptions.has(description)) {
+      if (!crossPostGroups.has(description)) {
+        crossPostGroups.set(description, []);
+      }
+      crossPostGroups.get(description)!.push(entry);
+    } else {
+      nonCrossPost.push(entry);
+    }
+  }
+  
+  // Sort entries within each cross-post group by date descending
+  for (const group of crossPostGroups.values()) {
+    group.sort((a, b) => getEntryDate(b) - getEntryDate(a));
+  }
+  
+  // Sort non-cross-posted entries by date descending
+  nonCrossPost.sort((a, b) => getEntryDate(b) - getEntryDate(a));
+  
+  // Create sortable items: each cross-post group as one item, each non-cross-post as one item
+  interface SortableItem {
+    date: number;
+    entries: RssEntry[];
+  }
+  
+  const sortableItems: SortableItem[] = [];
+  
+  // Add cross-post groups (use newest entry's date for group position)
+  for (const group of crossPostGroups.values()) {
+    if (group.length > 0) {
+      sortableItems.push({
+        date: getEntryDate(group[0]), // Already sorted, so first is newest
+        entries: group,
+      });
+    }
+  }
+  
+  // Add non-cross-posted entries individually
+  for (const entry of nonCrossPost) {
+    sortableItems.push({
+      date: getEntryDate(entry),
+      entries: [entry],
+    });
+  }
+  
+  // Sort all items by date descending
+  sortableItems.sort((a, b) => b.date - a.date);
+  
+  // Flatten back to a single array
+  return sortableItems.flatMap(item => item.entries);
+}
+
+function sortByDateDescending(entries: RssEntry[]): RssEntry[] {
+  return [...entries].sort((a, b) => getEntryDate(b) - getEntryDate(a));
+}
+
+function categorizeEntriesFromSource(entries: RssEntry[], crossPostDescriptions: Set<string>): CategorizedEntries {
   const toProcess: RssEntry[] = [];
   const processed: RssEntry[] = [];
   const ignored: RssEntry[] = [];
@@ -73,11 +172,11 @@ function categorizeEntriesFromSource(entries: RssEntry[]): CategorizedEntries {
     }
   }
 
-  // Sort each category by date, newest first
+  // Sort each category by date, grouping cross-posts together
   return {
-    toProcess: sortByDateDescending(toProcess),
-    processed: sortByDateDescending(processed),
-    ignored: sortByDateDescending(ignored),
+    toProcess: sortWithCrossPostGrouping(toProcess, crossPostDescriptions),
+    processed: sortWithCrossPostGrouping(processed, crossPostDescriptions),
+    ignored: sortWithCrossPostGrouping(ignored, crossPostDescriptions),
   };
 }
 
@@ -88,9 +187,12 @@ export default function FeedEntries({ entries, errors, loading }: FeedEntriesPro
     ignored: [],
   });
 
+  // Compute cross-post descriptions across all entries
+  const crossPostDescriptions = useMemo(() => findCrossPostDescriptions(entries), [entries]);
+
   const recategorize = useCallback(() => {
-    setCategorized(categorizeEntriesFromSource(entries));
-  }, [entries]);
+    setCategorized(categorizeEntriesFromSource(entries, crossPostDescriptions));
+  }, [entries, crossPostDescriptions]);
 
   useEffect(() => {
     recategorize();
@@ -109,7 +211,7 @@ export default function FeedEntries({ entries, errors, loading }: FeedEntriesPro
         break;
     }
     // Immediately recategorize after state change
-    setCategorized(categorizeEntriesFromSource(entries));
+    setCategorized(categorizeEntriesFromSource(entries, crossPostDescriptions));
   };
 
   if (loading) {
@@ -143,6 +245,7 @@ export default function FeedEntries({ entries, errors, loading }: FeedEntriesPro
         entries={categorized.toProcess}
         status="to_process"
         onAction={handleAction}
+        crossPostDescriptions={crossPostDescriptions}
       />
 
       <EntryTable
@@ -151,6 +254,7 @@ export default function FeedEntries({ entries, errors, loading }: FeedEntriesPro
         entries={categorized.processed}
         status="processed"
         onAction={handleAction}
+        crossPostDescriptions={crossPostDescriptions}
       />
 
       <EntryTable
@@ -159,6 +263,7 @@ export default function FeedEntries({ entries, errors, loading }: FeedEntriesPro
         entries={categorized.ignored}
         status="ignored"
         onAction={handleAction}
+        crossPostDescriptions={crossPostDescriptions}
       />
     </div>
   );
@@ -170,9 +275,10 @@ interface EntryTableProps {
   entries: RssEntry[];
   status: EntryStatus;
   onAction: (entryId: string, action: 'process' | 'ignore' | 'restore') => void;
+  crossPostDescriptions: Set<string>;
 }
 
-function EntryTable({ id, title, entries, status, onAction }: EntryTableProps) {
+function EntryTable({ id, title, entries, status, onAction, crossPostDescriptions }: EntryTableProps) {
   if (entries.length === 0) {
     return null;
   }
@@ -189,6 +295,7 @@ function EntryTable({ id, title, entries, status, onAction }: EntryTableProps) {
             entry={entry}
             status={status}
             onAction={onAction}
+            crossPostDescriptions={crossPostDescriptions}
           />
         ))}
       </div>
@@ -200,9 +307,10 @@ interface EntryRowProps {
   entry: RssEntry;
   status: EntryStatus;
   onAction: (entryId: string, action: 'process' | 'ignore' | 'restore') => void;
+  crossPostDescriptions: Set<string>;
 }
 
-function EntryRow({ entry, status, onAction }: EntryRowProps) {
+function EntryRow({ entry, status, onAction, crossPostDescriptions }: EntryRowProps) {
   const [showRawXml, setShowRawXml] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | undefined>(undefined);
   const [generating, setGenerating] = useState(false);
@@ -343,15 +451,52 @@ function EntryRow({ entry, status, onAction }: EntryRowProps) {
   const isLoadingOg = entry.ogLoading && !entry.og;
   const hasAiResponse = !!aiResponse;
 
+  // Determine labels
+  const isCrossPost = crossPostDescriptions.has((displayDescription || '').trim().toLowerCase());
+  const isDeleted = (displayDescription || '').toLowerCase().includes('[removed]');
+  const mentionsLiveKit = 
+    displayTitle.toLowerCase().includes('livekit') || 
+    (displayDescription || '').toLowerCase().includes('livekit');
+
   return (
     <div className={styles.entry}>
       <div className={styles.entryHeader}>
-        <span className={styles.entryFeed}>
-          {entry.feedTitle}
-          {isLoadingOg && (
-            <FontAwesomeIcon icon={faSpinner} spin className={styles.ogLoadingIcon} />
+        <div className={styles.entryHeaderLeft}>
+          <span className={styles.entryFeed}>
+            {entry.feedTitle}
+            {isLoadingOg && (
+              <FontAwesomeIcon icon={faSpinner} spin className={styles.ogLoadingIcon} />
+            )}
+          </span>
+          {(isComment || isCrossPost || isDeleted || mentionsLiveKit) && (
+            <div className={styles.entryLabels}>
+              {mentionsLiveKit && (
+                <span className={`${styles.label} ${styles.labelMentionsLiveKit}`}>
+                  <FontAwesomeIcon icon={faBullhorn} />
+                  <span>Mentions LiveKit</span>
+                </span>
+              )}
+              {isComment && (
+                <span className={`${styles.label} ${styles.labelComment}`}>
+                  <FontAwesomeIcon icon={faComment} />
+                  <span>Comment</span>
+                </span>
+              )}
+              {isCrossPost && (
+                <span className={`${styles.label} ${styles.labelCrossPost}`}>
+                  <FontAwesomeIcon icon={faCodeBranch} />
+                  <span>Cross Post</span>
+                </span>
+              )}
+              {isDeleted && (
+                <span className={`${styles.label} ${styles.labelDeleted}`}>
+                  <FontAwesomeIcon icon={faTrash} />
+                  <span>Deleted</span>
+                </span>
+              )}
+            </div>
           )}
-        </span>
+        </div>
         <div className={styles.entryActions}>
           {status === 'to_process' && (
             <>
@@ -385,8 +530,8 @@ function EntryRow({ entry, status, onAction }: EntryRowProps) {
       
       <div className={styles.entryContent}>
         {displayImage && (
-          <div className={`${styles.entryImageWrapper} ${displayImage === '/reddit-logo.svg' ? styles.redditImageWrapper : ''}`}>
-            <img src={displayImage} alt="" className={`${styles.entryImage} ${displayImage === '/reddit-logo.svg' ? styles.redditImage : ''}`} />
+          <div className={`${styles.entryImageWrapper} ${displayImage === '/reddit-logo.svg' ? styles.redditImageWrapper : ''} ${displayImage === '/hackernews-logo.svg' ? styles.hackerNewsImageWrapper : ''}`}>
+            <img src={displayImage} alt="" className={`${styles.entryImage} ${displayImage === '/reddit-logo.svg' ? styles.redditImage : ''} ${displayImage === '/hackernews-logo.svg' ? styles.hackerNewsImage : ''}`} />
           </div>
         )}
         <div className={styles.entryText}>

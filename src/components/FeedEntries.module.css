@@ -78,6 +78,12 @@
   background: var(--bg-tertiary);
 }
 
+.entryHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .entryFeed {
   display: flex;
   align-items: center;
@@ -87,6 +93,53 @@
   color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.02em;
+}
+
+/* Labels */
+.entryLabels {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1875rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-radius: 4px;
+}
+
+.label svg {
+  font-size: 0.625rem;
+}
+
+.labelComment {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.labelCrossPost {
+  background: rgba(139, 92, 246, 0.15);
+  color: #8b5cf6;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.labelDeleted {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.labelMentionsLiveKit {
+  background: rgba(0, 180, 216, 0.15);
+  color: #00b4d8;
+  border: 1px solid rgba(0, 180, 216, 0.3);
 }
 
 .ogLoadingIcon {
@@ -175,6 +228,19 @@
 }
 
 .redditImage {
+  object-fit: contain;
+  padding: 0;
+}
+
+/* Hacker News-specific image styling */
+.hackerNewsImageWrapper {
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.hackerNewsImage {
   object-fit: contain;
   padding: 0;
 }
