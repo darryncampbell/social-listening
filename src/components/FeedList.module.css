@@ -1,0 +1,15 @@
+.container {
+  width: 100%;
+}
+
+.title {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 1.25rem;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
