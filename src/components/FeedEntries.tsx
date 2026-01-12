@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faBan, faUndo, faExternalLinkAlt, faChevronDown, faChevronUp, faSpinner, faWandMagicSparkles, faRedo, faLink, faComment, faCodeBranch, faTrash, faBullhorn } from '@fortawesome/free-solid-svg-icons';
+import { faGithub } from '@fortawesome/free-brands-svg-icons';
 import { RssEntry } from '@/utils/rssParser';
 import {
   getEntryStatus,
@@ -25,7 +26,7 @@ function isRedditComment(url: string): boolean {
   return url.includes('reddit.com') && url.includes('/c/');
 }
 
-import { TagFilters } from '@/utils/tagFilter';
+import { TagFilters, getFeedFilterState } from '@/utils/tagFilter';
 
 interface FeedEntriesProps {
   entries: RssEntry[];
@@ -202,9 +203,16 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
 
   // Apply tag filters to entries
   const filteredEntries = useMemo(() => {
+    // Check if any static filters are hidden
+    const hasStaticFilter = Object.entries(tagFilters)
+      .filter(([key]) => key !== 'feeds')
+      .some(([, value]) => value === 'hidden');
+    
+    // Check if any feed filters are hidden
+    const hasFeedFilter = Object.values(tagFilters.feeds).some(v => v === 'hidden');
+    
     // If no filters are set to hidden, return all entries
-    const hasActiveFilter = Object.values(tagFilters).some(v => v === 'hidden');
-    if (!hasActiveFilter) return entries;
+    if (!hasStaticFilter && !hasFeedFilter) return entries;
 
     const interestLower = interest.toLowerCase();
     
@@ -219,6 +227,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
       const mentionsInterest = 
         displayTitle.toLowerCase().includes(interestLower) || 
         displayDescription.toLowerCase().includes(interestLower);
+      const isGitHub = entry.link?.includes('github.com/livekit') ?? false;
       
       // Compute status tag values for this entry
       const status = getEntryStatus(entry.id);
@@ -231,11 +240,17 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
       if (tagFilters.crossPost === 'hidden' && isCrossPost) return false;
       if (tagFilters.deleted === 'hidden' && isDeleted) return false;
       if (tagFilters.mentionsInterest === 'hidden' && mentionsInterest) return false;
+      if (tagFilters.github === 'hidden' && isGitHub) return false;
       
       // Apply status tag filters - hide entries with a hidden status
       if (tagFilters.statusToProcess === 'hidden' && isToProcess) return false;
       if (tagFilters.statusDone === 'hidden' && isDone) return false;
       if (tagFilters.statusIgnored === 'hidden' && isIgnored) return false;
+      
+      // Apply feed filters - hide entries from hidden feeds
+      if (entry.feedTitle && getFeedFilterState(tagFilters, entry.feedTitle) === 'hidden') {
+        return false;
+      }
       
       return true;
     });
@@ -515,6 +530,7 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest }: 
   const mentionsInterest = 
     displayTitle.toLowerCase().includes(interestLower) || 
     (displayDescription || '').toLowerCase().includes(interestLower);
+  const isGitHub = entry.link?.includes('github.com/livekit') ?? false;
 
   return (
     <div className={styles.entry}>
@@ -526,12 +542,18 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest }: 
               <FontAwesomeIcon icon={faSpinner} spin className={styles.ogLoadingIcon} />
             )}
           </span>
-          {(isComment || isCrossPost || isDeleted || mentionsInterest) && (
+          {(isComment || isCrossPost || isDeleted || mentionsInterest || isGitHub) && (
             <div className={styles.entryLabels}>
               {mentionsInterest && (
                 <span className={`${styles.label} ${styles.labelMentionsInterest}`}>
                   <FontAwesomeIcon icon={faBullhorn} />
                   <span>Mentions {interest}</span>
+                </span>
+              )}
+              {isGitHub && (
+                <span className={`${styles.label} ${styles.labelGitHub}`}>
+                  <FontAwesomeIcon icon={faGithub} />
+                  <span>GitHub</span>
                 </span>
               )}
               {isComment && (

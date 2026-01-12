@@ -142,6 +142,12 @@
   border: 1px solid rgba(0, 180, 216, 0.3);
 }
 
+.labelGitHub {
+  background: rgba(110, 84, 148, 0.15);
+  color: #6e5494;
+  border: 1px solid rgba(110, 84, 148, 0.3);
+}
+
 .ogLoadingIcon {
   font-size: 0.625rem;
   color: var(--text-muted);

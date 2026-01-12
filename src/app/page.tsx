@@ -27,7 +27,15 @@ export default function Home() {
     if (storedFilters) {
       try {
         const parsed = JSON.parse(storedFilters);
-        setTagFilters({ ...DEFAULT_TAG_FILTERS, ...parsed });
+        // Merge with defaults, ensuring feeds object is properly merged
+        setTagFilters({
+          ...DEFAULT_TAG_FILTERS,
+          ...parsed,
+          feeds: {
+            ...DEFAULT_TAG_FILTERS.feeds,
+            ...(parsed.feeds || {}),
+          },
+        });
       } catch {
         // Use defaults if parsing fails
       }
@@ -110,6 +118,7 @@ export default function Home() {
         onSyncComplete={handleSyncComplete}
         tagFilters={tagFilters}
         onTagFiltersChange={handleTagFiltersChange}
+        entries={entries}
       />
       <FeedEntries entries={entries} errors={errors} loading={loading} tagFilters={tagFilters} />
     </div>

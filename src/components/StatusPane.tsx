@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
 import styles from './StatusPane.module.css';
 import PromptModal, { PromptType } from './PromptModal';
 import { syncAllFeeds, RssEntry } from '@/utils/rssParser';
-import { TagFilters, TagType, ContentTagType, StatusTagType, CONTENT_TAG_LABELS, STATUS_TAG_LABELS, toggleFilterState } from '@/utils/tagFilter';
+import { TagFilters, TagType, ContentTagType, StatusTagType, CONTENT_TAG_LABELS, STATUS_TAG_LABELS, toggleFilterState, getFeedFilterState } from '@/utils/tagFilter';
 import { getInterest } from '@/utils/interestConfig';
 
 const FEEDS_STORAGE_KEY = 'social-listening-feeds';
@@ -23,9 +23,10 @@ interface StatusPaneProps {
   onSyncStart?: () => void;
   tagFilters: TagFilters;
   onTagFiltersChange: (filters: TagFilters) => void;
+  entries: RssEntry[];
 }
 
-export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, onTagFiltersChange }: StatusPaneProps) {
+export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, onTagFiltersChange, entries }: StatusPaneProps) {
   const [feedCount, setFeedCount] = useState<number>(0);
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
@@ -37,6 +38,17 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
   const [filterOpen, setFilterOpen] = useState(false);
   const [interest, setInterest] = useState('');
   const filterRef = useRef<HTMLDivElement>(null);
+
+  // Extract unique feed titles from entries
+  const uniqueFeedTitles = useMemo(() => {
+    const titles = new Set<string>();
+    for (const entry of entries) {
+      if (entry.feedTitle) {
+        titles.add(entry.feedTitle);
+      }
+    }
+    return Array.from(titles).sort();
+  }, [entries]);
 
   // Check if sync is stale (more than 12 hours ago)
   const checkSyncStale = useCallback(() => {
@@ -109,7 +121,34 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
     });
   };
 
-  const activeFilterCount = Object.values(tagFilters).filter(v => v === 'hidden').length;
+  const handleFeedFilterChange = (feedTitle: string) => {
+    const currentState = getFeedFilterState(tagFilters, feedTitle);
+    onTagFiltersChange({
+      ...tagFilters,
+      feeds: {
+        ...tagFilters.feeds,
+        [feedTitle]: toggleFilterState(currentState),
+      },
+    });
+  };
+
+  // Count hidden filters (excluding feeds object, then add hidden feed count)
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    // Count static filters
+    for (const [key, value] of Object.entries(tagFilters)) {
+      if (key !== 'feeds' && value === 'hidden') {
+        count++;
+      }
+    }
+    // Count hidden feeds
+    for (const value of Object.values(tagFilters.feeds)) {
+      if (value === 'hidden') {
+        count++;
+      }
+    }
+    return count;
+  }, [tagFilters]);
 
   const handleSync = async () => {
     if (feeds.length === 0) {
@@ -179,7 +218,7 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
             {filterOpen && (
               <div className={styles.filterDropdown}>
                 <div className={styles.filterHeader}>Filter by Content</div>
-                {(['comment', 'crossPost', 'deleted', 'mentionsInterest'] as ContentTagType[]).map((tag) => (
+                {(['comment', 'crossPost', 'deleted', 'mentionsInterest', 'github'] as ContentTagType[]).map((tag) => (
                   <button
                     key={tag}
                     className={`${styles.filterOption} ${tagFilters[tag] === 'hidden' ? styles.filterOptionHidden : ''}`}
@@ -194,6 +233,29 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
                     </span>
                   </button>
                 ))}
+                {uniqueFeedTitles.length > 0 && (
+                  <>
+                    <div className={styles.filterHeader}>Filter by Feed</div>
+                    {uniqueFeedTitles.map((feedTitle) => {
+                      const feedState = getFeedFilterState(tagFilters, feedTitle);
+                      return (
+                        <button
+                          key={feedTitle}
+                          className={`${styles.filterOption} ${feedState === 'hidden' ? styles.filterOptionHidden : ''}`}
+                          onClick={() => handleFeedFilterChange(feedTitle)}
+                        >
+                          <span className={styles.filterOptionLabel}>
+                            {feedTitle}
+                          </span>
+                          <span className={`${styles.filterState} ${styles[`filterState_${feedState}`]}`}>
+                            <FontAwesomeIcon icon={feedState === 'shown' ? faEye : faEyeSlash} />
+                            <span>{feedState === 'shown' ? 'Shown' : 'Hidden'}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </>
+                )}
                 <div className={styles.filterHeader}>Filter by Status</div>
                 {(['statusToProcess', 'statusDone', 'statusIgnored'] as StatusTagType[]).map((tag) => (
                   <button
