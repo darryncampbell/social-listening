@@ -25,10 +25,13 @@ function isRedditComment(url: string): boolean {
   return url.includes('reddit.com') && url.includes('/c/');
 }
 
+import { TagFilters } from '@/utils/tagFilter';
+
 interface FeedEntriesProps {
   entries: RssEntry[];
   errors: Array<{ feedTitle: string; error: string }>;
   loading: boolean;
+  tagFilters: TagFilters;
 }
 
 interface CategorizedEntries {
@@ -181,7 +184,7 @@ function categorizeEntriesFromSource(entries: RssEntry[], crossPostDescriptions:
   };
 }
 
-export default function FeedEntries({ entries, errors, loading }: FeedEntriesProps) {
+export default function FeedEntries({ entries, errors, loading, tagFilters }: FeedEntriesProps) {
   const [categorized, setCategorized] = useState<CategorizedEntries>({
     toProcess: [],
     processed: [],
@@ -197,9 +200,50 @@ export default function FeedEntries({ entries, errors, loading }: FeedEntriesPro
   // Compute cross-post descriptions across all entries
   const crossPostDescriptions = useMemo(() => findCrossPostDescriptions(entries), [entries]);
 
+  // Apply tag filters to entries
+  const filteredEntries = useMemo(() => {
+    // If all filters are off, return all entries
+    const hasActiveFilter = Object.values(tagFilters).some(v => v !== 'off');
+    if (!hasActiveFilter) return entries;
+
+    const interestLower = interest.toLowerCase();
+    
+    return entries.filter(entry => {
+      const displayTitle = entry.og?.ogTitle || entry.title || '';
+      const displayDescription = entry.og?.ogDescription || entry.description || '';
+      
+      // Compute tag values for this entry
+      const isComment = isRedditComment(entry.link);
+      const isCrossPost = crossPostDescriptions.has(displayDescription.trim().toLowerCase());
+      const isDeleted = displayDescription.toLowerCase().includes('[removed]');
+      const mentionsInterest = 
+        displayTitle.toLowerCase().includes(interestLower) || 
+        displayDescription.toLowerCase().includes(interestLower);
+      
+      // Apply each filter
+      // 'include' = show only entries WITH this tag (entry must have tag)
+      // 'exclude' = show only entries WITHOUT this tag (entry must not have tag)
+      // 'off' = don't filter by this tag
+      
+      if (tagFilters.comment === 'include' && !isComment) return false;
+      if (tagFilters.comment === 'exclude' && isComment) return false;
+      
+      if (tagFilters.crossPost === 'include' && !isCrossPost) return false;
+      if (tagFilters.crossPost === 'exclude' && isCrossPost) return false;
+      
+      if (tagFilters.deleted === 'include' && !isDeleted) return false;
+      if (tagFilters.deleted === 'exclude' && isDeleted) return false;
+      
+      if (tagFilters.mentionsInterest === 'include' && !mentionsInterest) return false;
+      if (tagFilters.mentionsInterest === 'exclude' && mentionsInterest) return false;
+      
+      return true;
+    });
+  }, [entries, tagFilters, interest, crossPostDescriptions]);
+
   const recategorize = useCallback(() => {
-    setCategorized(categorizeEntriesFromSource(entries, crossPostDescriptions));
-  }, [entries, crossPostDescriptions]);
+    setCategorized(categorizeEntriesFromSource(filteredEntries, crossPostDescriptions));
+  }, [filteredEntries, crossPostDescriptions]);
 
   useEffect(() => {
     recategorize();
@@ -218,7 +262,7 @@ export default function FeedEntries({ entries, errors, loading }: FeedEntriesPro
         break;
     }
     // Immediately recategorize after state change
-    setCategorized(categorizeEntriesFromSource(entries, crossPostDescriptions));
+    setCategorized(categorizeEntriesFromSource(filteredEntries, crossPostDescriptions));
   };
 
   if (loading) {

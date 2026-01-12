@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSync, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+import { faSync, faExclamationTriangle, faFilter, faCheck, faBan, faMinus } from '@fortawesome/free-solid-svg-icons';
 import styles from './StatusPane.module.css';
 import PromptModal, { PromptType } from './PromptModal';
 import { syncAllFeeds, RssEntry } from '@/utils/rssParser';
+import { TagFilters, TagType, TagFilterState, TAG_LABELS, getNextFilterState } from '@/utils/tagFilter';
+import { getInterest } from '@/utils/interestConfig';
 
 const FEEDS_STORAGE_KEY = 'social-listening-feeds';
 const SYNC_TIME_STORAGE_KEY = 'social-listening-last-sync';
@@ -19,9 +21,11 @@ interface Feed {
 interface StatusPaneProps {
   onSyncComplete?: (entries: RssEntry[], errors: Array<{ feedTitle: string; error: string }>) => void;
   onSyncStart?: () => void;
+  tagFilters: TagFilters;
+  onTagFiltersChange: (filters: TagFilters) => void;
 }
 
-export default function StatusPane({ onSyncComplete, onSyncStart }: StatusPaneProps) {
+export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, onTagFiltersChange }: StatusPaneProps) {
   const [feedCount, setFeedCount] = useState<number>(0);
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
@@ -30,6 +34,9 @@ export default function StatusPane({ onSyncComplete, onSyncStart }: StatusPanePr
   const [mounted, setMounted] = useState(false);
   const [promptModalType, setPromptModalType] = useState<PromptType | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [interest, setInterest] = useState('');
+  const filterRef = useRef<HTMLDivElement>(null);
 
   // Check if sync is stale (more than 12 hours ago)
   const checkSyncStale = useCallback(() => {
@@ -78,6 +85,31 @@ export default function StatusPane({ onSyncComplete, onSyncStart }: StatusPanePr
   useEffect(() => {
     checkSyncStale();
   }, [checkSyncStale]);
+
+  // Load interest name for display
+  useEffect(() => {
+    setInterest(getInterest());
+  }, []);
+
+  // Close filter dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setFilterOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleTagFilterChange = (tag: TagType) => {
+    onTagFiltersChange({
+      ...tagFilters,
+      [tag]: getNextFilterState(tagFilters[tag]),
+    });
+  };
+
+  const activeFilterCount = Object.values(tagFilters).filter(v => v !== 'off').length;
 
   const handleSync = async () => {
     if (feeds.length === 0) {
@@ -132,6 +164,55 @@ export default function StatusPane({ onSyncComplete, onSyncStart }: StatusPanePr
           </div>
         </div>
         <div className={styles.actions}>
+          <div className={styles.filterWrapper} ref={filterRef}>
+            <button
+              className={`${styles.filterButton} ${activeFilterCount > 0 ? styles.filterActive : ''}`}
+              onClick={() => setFilterOpen(!filterOpen)}
+              title="Filter by tags"
+            >
+              <FontAwesomeIcon icon={faFilter} />
+              <span>Filter</span>
+              {activeFilterCount > 0 && (
+                <span className={styles.filterBadge}>{activeFilterCount}</span>
+              )}
+            </button>
+            {filterOpen && (
+              <div className={styles.filterDropdown}>
+                <div className={styles.filterHeader}>Filter by Tag</div>
+                {(['comment', 'crossPost', 'deleted', 'mentionsInterest'] as TagType[]).map((tag) => (
+                  <button
+                    key={tag}
+                    className={`${styles.filterOption} ${tagFilters[tag] !== 'off' ? styles.filterOptionActive : ''}`}
+                    onClick={() => handleTagFilterChange(tag)}
+                  >
+                    <span className={styles.filterOptionLabel}>
+                      {tag === 'mentionsInterest' ? `Mentions ${interest}` : TAG_LABELS[tag]}
+                    </span>
+                    <span className={`${styles.filterState} ${styles[`filterState_${tagFilters[tag]}`]}`}>
+                      {tagFilters[tag] === 'off' && (
+                        <>
+                          <FontAwesomeIcon icon={faMinus} />
+                          <span>Off</span>
+                        </>
+                      )}
+                      {tagFilters[tag] === 'include' && (
+                        <>
+                          <FontAwesomeIcon icon={faCheck} />
+                          <span>Only</span>
+                        </>
+                      )}
+                      {tagFilters[tag] === 'exclude' && (
+                        <>
+                          <FontAwesomeIcon icon={faBan} />
+                          <span>Hide</span>
+                        </>
+                      )}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             className={`${styles.syncButton} ${syncing ? styles.syncing : ''}`}
             onClick={handleSync}

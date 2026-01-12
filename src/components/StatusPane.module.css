@@ -122,3 +122,123 @@
 .promptButton:active {
   transform: scale(0.98);
 }
+
+.filterWrapper {
+  position: relative;
+}
+
+.filterButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filterButton:hover {
+  background: var(--bg-button-hover);
+  color: var(--text-primary);
+}
+
+.filterButton.filterActive {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.filterBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--accent);
+  color: white;
+  border-radius: 9px;
+}
+
+.filterDropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.filterHeader {
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.filterOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.1s ease;
+  text-align: left;
+}
+
+.filterOption:hover {
+  background: var(--bg-button-hover);
+}
+
+.filterOption:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.filterOptionLabel {
+  font-weight: 500;
+}
+
+.filterState {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.filterState_off {
+  color: var(--text-muted);
+  background: transparent;
+}
+
+.filterState_include {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.15);
+}
+
+.filterState_exclude {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+}

@@ -5,18 +5,34 @@ import StatusPane from '@/components/StatusPane';
 import FeedEntries from '@/components/FeedEntries';
 import { RssEntry, fetchOgData } from '@/utils/rssParser';
 import { saveEntries, loadEntries } from '@/utils/entryStorage';
+import { TagFilters, DEFAULT_TAG_FILTERS } from '@/utils/tagFilter';
 import styles from './page.module.css';
+
+const TAG_FILTERS_STORAGE_KEY = 'social-listening-tag-filters';
 
 export default function Home() {
   const [entries, setEntries] = useState<RssEntry[]>([]);
   const [errors, setErrors] = useState<Array<{ feedTitle: string; error: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [tagFilters, setTagFilters] = useState<TagFilters>(DEFAULT_TAG_FILTERS);
 
-  // Load entries from localStorage on mount
+  // Load entries and tag filters from localStorage on mount
   useEffect(() => {
     const storedEntries = loadEntries();
     setEntries(storedEntries);
+    
+    // Load tag filters
+    const storedFilters = localStorage.getItem(TAG_FILTERS_STORAGE_KEY);
+    if (storedFilters) {
+      try {
+        const parsed = JSON.parse(storedFilters);
+        setTagFilters({ ...DEFAULT_TAG_FILTERS, ...parsed });
+      } catch {
+        // Use defaults if parsing fails
+      }
+    }
+    
     setMounted(true);
   }, []);
 
@@ -24,6 +40,11 @@ export default function Home() {
     setLoading(true);
     setErrors([]);
   };
+
+  const handleTagFiltersChange = useCallback((filters: TagFilters) => {
+    setTagFilters(filters);
+    localStorage.setItem(TAG_FILTERS_STORAGE_KEY, JSON.stringify(filters));
+  }, []);
 
   // Fetch OG data for entries that don't have it yet
   const fetchOgDataForEntries = useCallback(async (entriesToProcess: RssEntry[]) => {
@@ -84,8 +105,13 @@ export default function Home() {
 
   return (
     <div className={styles.container}>
-      <StatusPane onSyncStart={handleSyncStart} onSyncComplete={handleSyncComplete} />
-      <FeedEntries entries={entries} errors={errors} loading={loading} />
+      <StatusPane 
+        onSyncStart={handleSyncStart} 
+        onSyncComplete={handleSyncComplete}
+        tagFilters={tagFilters}
+        onTagFiltersChange={handleTagFiltersChange}
+      />
+      <FeedEntries entries={entries} errors={errors} loading={loading} tagFilters={tagFilters} />
     </div>
   );
 }
