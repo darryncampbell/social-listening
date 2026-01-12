@@ -16,7 +16,16 @@ export default function Header() {
     <header className={styles.header}>
       <div className={styles.brand}>
         <h1 className={styles.title}>
-          {isConfigPage ? 'Social Listening: Configuration' : 'Social Listening'}
+          <a 
+            href="#" 
+            onClick={(e) => {
+              e.preventDefault();
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className={styles.titleLink}
+          >
+            {isConfigPage ? 'Social Listening: Configuration' : 'Social Listening'}
+          </a>
         </h1>
       </div>
       <nav className={styles.nav}>

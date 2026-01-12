@@ -202,8 +202,8 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
 
   // Apply tag filters to entries
   const filteredEntries = useMemo(() => {
-    // If all filters are off, return all entries
-    const hasActiveFilter = Object.values(tagFilters).some(v => v !== 'off');
+    // If no filters are set to hidden, return all entries
+    const hasActiveFilter = Object.values(tagFilters).some(v => v === 'hidden');
     if (!hasActiveFilter) return entries;
 
     const interestLower = interest.toLowerCase();
@@ -212,7 +212,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
       const displayTitle = entry.og?.ogTitle || entry.title || '';
       const displayDescription = entry.og?.ogDescription || entry.description || '';
       
-      // Compute tag values for this entry
+      // Compute content tag values for this entry
       const isComment = isRedditComment(entry.link);
       const isCrossPost = crossPostDescriptions.has(displayDescription.trim().toLowerCase());
       const isDeleted = displayDescription.toLowerCase().includes('[removed]');
@@ -220,22 +220,22 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
         displayTitle.toLowerCase().includes(interestLower) || 
         displayDescription.toLowerCase().includes(interestLower);
       
-      // Apply each filter
-      // 'include' = show only entries WITH this tag (entry must have tag)
-      // 'exclude' = show only entries WITHOUT this tag (entry must not have tag)
-      // 'off' = don't filter by this tag
+      // Compute status tag values for this entry
+      const status = getEntryStatus(entry.id);
+      const isToProcess = status === 'to_process';
+      const isDone = status === 'processed';
+      const isIgnored = status === 'ignored';
       
-      if (tagFilters.comment === 'include' && !isComment) return false;
-      if (tagFilters.comment === 'exclude' && isComment) return false;
+      // Apply content tag filters - hide entries that have a hidden tag
+      if (tagFilters.comment === 'hidden' && isComment) return false;
+      if (tagFilters.crossPost === 'hidden' && isCrossPost) return false;
+      if (tagFilters.deleted === 'hidden' && isDeleted) return false;
+      if (tagFilters.mentionsInterest === 'hidden' && mentionsInterest) return false;
       
-      if (tagFilters.crossPost === 'include' && !isCrossPost) return false;
-      if (tagFilters.crossPost === 'exclude' && isCrossPost) return false;
-      
-      if (tagFilters.deleted === 'include' && !isDeleted) return false;
-      if (tagFilters.deleted === 'exclude' && isDeleted) return false;
-      
-      if (tagFilters.mentionsInterest === 'include' && !mentionsInterest) return false;
-      if (tagFilters.mentionsInterest === 'exclude' && mentionsInterest) return false;
+      // Apply status tag filters - hide entries with a hidden status
+      if (tagFilters.statusToProcess === 'hidden' && isToProcess) return false;
+      if (tagFilters.statusDone === 'hidden' && isDone) return false;
+      if (tagFilters.statusIgnored === 'hidden' && isIgnored) return false;
       
       return true;
     });

@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSync, faExclamationTriangle, faFilter, faCheck, faBan, faMinus } from '@fortawesome/free-solid-svg-icons';
+import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
 import styles from './StatusPane.module.css';
 import PromptModal, { PromptType } from './PromptModal';
 import { syncAllFeeds, RssEntry } from '@/utils/rssParser';
-import { TagFilters, TagType, TagFilterState, TAG_LABELS, getNextFilterState } from '@/utils/tagFilter';
+import { TagFilters, TagType, ContentTagType, StatusTagType, CONTENT_TAG_LABELS, STATUS_TAG_LABELS, toggleFilterState } from '@/utils/tagFilter';
 import { getInterest } from '@/utils/interestConfig';
 
 const FEEDS_STORAGE_KEY = 'social-listening-feeds';
@@ -105,11 +105,11 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
   const handleTagFilterChange = (tag: TagType) => {
     onTagFiltersChange({
       ...tagFilters,
-      [tag]: getNextFilterState(tagFilters[tag]),
+      [tag]: toggleFilterState(tagFilters[tag]),
     });
   };
 
-  const activeFilterCount = Object.values(tagFilters).filter(v => v !== 'off').length;
+  const activeFilterCount = Object.values(tagFilters).filter(v => v === 'hidden').length;
 
   const handleSync = async () => {
     if (feeds.length === 0) {
@@ -178,35 +178,35 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
             </button>
             {filterOpen && (
               <div className={styles.filterDropdown}>
-                <div className={styles.filterHeader}>Filter by Tag</div>
-                {(['comment', 'crossPost', 'deleted', 'mentionsInterest'] as TagType[]).map((tag) => (
+                <div className={styles.filterHeader}>Filter by Content</div>
+                {(['comment', 'crossPost', 'deleted', 'mentionsInterest'] as ContentTagType[]).map((tag) => (
                   <button
                     key={tag}
-                    className={`${styles.filterOption} ${tagFilters[tag] !== 'off' ? styles.filterOptionActive : ''}`}
+                    className={`${styles.filterOption} ${tagFilters[tag] === 'hidden' ? styles.filterOptionHidden : ''}`}
                     onClick={() => handleTagFilterChange(tag)}
                   >
                     <span className={styles.filterOptionLabel}>
-                      {tag === 'mentionsInterest' ? `Mentions ${interest}` : TAG_LABELS[tag]}
+                      {tag === 'mentionsInterest' ? `Mentions ${interest}` : CONTENT_TAG_LABELS[tag]}
                     </span>
                     <span className={`${styles.filterState} ${styles[`filterState_${tagFilters[tag]}`]}`}>
-                      {tagFilters[tag] === 'off' && (
-                        <>
-                          <FontAwesomeIcon icon={faMinus} />
-                          <span>Off</span>
-                        </>
-                      )}
-                      {tagFilters[tag] === 'include' && (
-                        <>
-                          <FontAwesomeIcon icon={faCheck} />
-                          <span>Only</span>
-                        </>
-                      )}
-                      {tagFilters[tag] === 'exclude' && (
-                        <>
-                          <FontAwesomeIcon icon={faBan} />
-                          <span>Hide</span>
-                        </>
-                      )}
+                      <FontAwesomeIcon icon={tagFilters[tag] === 'shown' ? faEye : faEyeSlash} />
+                      <span>{tagFilters[tag] === 'shown' ? 'Shown' : 'Hidden'}</span>
+                    </span>
+                  </button>
+                ))}
+                <div className={styles.filterHeader}>Filter by Status</div>
+                {(['statusToProcess', 'statusDone', 'statusIgnored'] as StatusTagType[]).map((tag) => (
+                  <button
+                    key={tag}
+                    className={`${styles.filterOption} ${tagFilters[tag] === 'hidden' ? styles.filterOptionHidden : ''}`}
+                    onClick={() => handleTagFilterChange(tag)}
+                  >
+                    <span className={styles.filterOptionLabel}>
+                      {STATUS_TAG_LABELS[tag]}
+                    </span>
+                    <span className={`${styles.filterState} ${styles[`filterState_${tagFilters[tag]}`]}`}>
+                      <FontAwesomeIcon icon={tagFilters[tag] === 'shown' ? faEye : faEyeSlash} />
+                      <span>{tagFilters[tag] === 'shown' ? 'Shown' : 'Hidden'}</span>
                     </span>
                   </button>
                 ))}
