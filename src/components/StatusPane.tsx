@@ -203,6 +203,14 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
           </div>
         </div>
         <div className={styles.actions}>
+          <button
+            className={`${styles.syncButton} ${syncing ? styles.syncing : ''}`}
+            onClick={handleSync}
+            title="Sync"
+            disabled={syncing || feedCount === 0}
+          >
+            <FontAwesomeIcon icon={faSync} spin={syncing} />
+          </button>
           <div className={styles.filterWrapper} ref={filterRef}>
             <button
               className={`${styles.filterButton} ${activeFilterCount > 0 ? styles.filterActive : ''}`}
@@ -275,14 +283,6 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
               </div>
             )}
           </div>
-          <button
-            className={`${styles.syncButton} ${syncing ? styles.syncing : ''}`}
-            onClick={handleSync}
-            title="Sync"
-            disabled={syncing || feedCount === 0}
-          >
-            <FontAwesomeIcon icon={faSync} spin={syncing} />
-          </button>
           <button
             className={styles.promptButton}
             onClick={() => setPromptModalType('article')}
