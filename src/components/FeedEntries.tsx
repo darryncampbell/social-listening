@@ -13,6 +13,7 @@ import {
 } from '@/utils/entryState';
 import { getAiResponse, saveAiResponse } from '@/utils/aiResponseStorage';
 import { getPrompt, getCommentPrompt } from '@/utils/promptConfig';
+import { getInterest } from '@/utils/interestConfig';
 import styles from './FeedEntries.module.css';
 
 /**
@@ -186,6 +187,12 @@ export default function FeedEntries({ entries, errors, loading }: FeedEntriesPro
     processed: [],
     ignored: [],
   });
+  const [interest, setInterest] = useState('Darryn Campbell');
+
+  // Load interest configuration on mount
+  useEffect(() => {
+    setInterest(getInterest());
+  }, []);
 
   // Compute cross-post descriptions across all entries
   const crossPostDescriptions = useMemo(() => findCrossPostDescriptions(entries), [entries]);
@@ -246,6 +253,7 @@ export default function FeedEntries({ entries, errors, loading }: FeedEntriesPro
         status="to_process"
         onAction={handleAction}
         crossPostDescriptions={crossPostDescriptions}
+        interest={interest}
       />
 
       <EntryTable
@@ -255,6 +263,7 @@ export default function FeedEntries({ entries, errors, loading }: FeedEntriesPro
         status="processed"
         onAction={handleAction}
         crossPostDescriptions={crossPostDescriptions}
+        interest={interest}
       />
 
       <EntryTable
@@ -264,6 +273,7 @@ export default function FeedEntries({ entries, errors, loading }: FeedEntriesPro
         status="ignored"
         onAction={handleAction}
         crossPostDescriptions={crossPostDescriptions}
+        interest={interest}
       />
     </div>
   );
@@ -276,9 +286,10 @@ interface EntryTableProps {
   status: EntryStatus;
   onAction: (entryId: string, action: 'process' | 'ignore' | 'restore') => void;
   crossPostDescriptions: Set<string>;
+  interest: string;
 }
 
-function EntryTable({ id, title, entries, status, onAction, crossPostDescriptions }: EntryTableProps) {
+function EntryTable({ id, title, entries, status, onAction, crossPostDescriptions, interest }: EntryTableProps) {
   if (entries.length === 0) {
     return null;
   }
@@ -296,6 +307,7 @@ function EntryTable({ id, title, entries, status, onAction, crossPostDescription
             status={status}
             onAction={onAction}
             crossPostDescriptions={crossPostDescriptions}
+            interest={interest}
           />
         ))}
       </div>
@@ -308,9 +320,10 @@ interface EntryRowProps {
   status: EntryStatus;
   onAction: (entryId: string, action: 'process' | 'ignore' | 'restore') => void;
   crossPostDescriptions: Set<string>;
+  interest: string;
 }
 
-function EntryRow({ entry, status, onAction, crossPostDescriptions }: EntryRowProps) {
+function EntryRow({ entry, status, onAction, crossPostDescriptions, interest }: EntryRowProps) {
   const [showRawXml, setShowRawXml] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | undefined>(undefined);
   const [generating, setGenerating] = useState(false);
@@ -454,9 +467,10 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions }: EntryRowPr
   // Determine labels
   const isCrossPost = crossPostDescriptions.has((displayDescription || '').trim().toLowerCase());
   const isDeleted = (displayDescription || '').toLowerCase().includes('[removed]');
-  const mentionsLiveKit = 
-    displayTitle.toLowerCase().includes('livekit') || 
-    (displayDescription || '').toLowerCase().includes('livekit');
+  const interestLower = interest.toLowerCase();
+  const mentionsInterest = 
+    displayTitle.toLowerCase().includes(interestLower) || 
+    (displayDescription || '').toLowerCase().includes(interestLower);
 
   return (
     <div className={styles.entry}>
@@ -468,12 +482,12 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions }: EntryRowPr
               <FontAwesomeIcon icon={faSpinner} spin className={styles.ogLoadingIcon} />
             )}
           </span>
-          {(isComment || isCrossPost || isDeleted || mentionsLiveKit) && (
+          {(isComment || isCrossPost || isDeleted || mentionsInterest) && (
             <div className={styles.entryLabels}>
-              {mentionsLiveKit && (
-                <span className={`${styles.label} ${styles.labelMentionsLiveKit}`}>
+              {mentionsInterest && (
+                <span className={`${styles.label} ${styles.labelMentionsInterest}`}>
                   <FontAwesomeIcon icon={faBullhorn} />
-                  <span>Mentions LiveKit</span>
+                  <span>Mentions {interest}</span>
                 </span>
               )}
               {isComment && (
