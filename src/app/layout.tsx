@@ -6,6 +6,9 @@ import Providers from '@/components/Providers';
 export const metadata: Metadata = {
   title: 'Social Listening',
   description: 'Social Listening Application',
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 // Script to prevent flash of wrong theme
