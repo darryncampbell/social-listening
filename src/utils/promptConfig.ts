@@ -14,7 +14,7 @@ GUIDELINES:
 - If you disagree with something in the article, respectfully offer an alternative viewpoint
 
 FORMAT:
-- Keep it concise (2-4 short paragraphs)
+- Keep it concise (1-2 short paragraphs)
 - Write in a conversational, approachable tone - not corporate or stiff
 - This will be edited by a human, so prioritize information density over polish
 
@@ -38,7 +38,7 @@ GUIDELINES:
 - If they're asking for help, provide actionable guidance
 
 FORMAT:
-- Keep it brief (1-2 short paragraphs)
+- Keep it brief (1 short paragraph)
 - Write in a friendly, conversational tone
 - This will be edited by a human, so prioritize information density over polish
 
