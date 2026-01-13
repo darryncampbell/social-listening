@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import OpenAI from 'openai';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/utils/rateLimit';
-import { sanitizeForPrompt, wrapUserContent, containsInjectionAttempt } from '@/utils/sanitize';
+import { sanitizeForPrompt, wrapUserContent, containsInjectionAttempt, stripHtml } from '@/utils/sanitize';
 
 const API_KEY_COOKIE = 'openai-api-key';
 
@@ -56,14 +56,18 @@ export async function POST(request: NextRequest) {
       apiKey: apiKey,
     });
 
-    // Sanitize user-provided content to prevent prompt injection
+    // Strip HTML and sanitize user-provided content to prevent prompt injection
     const sanitizedUrl = sanitizeForPrompt(url);
-    const sanitizedTitle = sanitizeForPrompt(title || 'Unknown');
-    const sanitizedDescription = sanitizeForPrompt(description || 'No description available');
+    const sanitizedTitle = sanitizeForPrompt(stripHtml(title || 'Unknown'));
+    const sanitizedDescription = sanitizeForPrompt(stripHtml(description || 'No description available'));
     const sanitizedPrompt = sanitizeForPrompt(prompt || '');
 
-    // Replace ${url} placeholder with sanitized URL
-    const processedPrompt = sanitizedPrompt.replace(/\$\{url\}/g, sanitizedUrl);
+    // Replace placeholders with sanitized values
+    // Supports: ${url}, ${title}, ${description}
+    const processedPrompt = sanitizedPrompt
+      .replace(/\$\{url\}/g, sanitizedUrl)
+      .replace(/\$\{title\}/g, sanitizedTitle)
+      .replace(/\$\{description\}/g, sanitizedDescription);
     
     // Build a context message with clearly delimited user content
     // This helps the model distinguish between instructions and user-provided data

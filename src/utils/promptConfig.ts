@@ -1,7 +1,7 @@
 // Article Response Prompt
 export const ARTICLE_PROMPT_STORAGE_KEY = 'social-listening-default-prompt';
 
-export const DEFAULT_ARTICLE_PROMPT = `You are drafting a response to the article at \${url} on behalf of a senior engineer at LiveKit.
+export const DEFAULT_ARTICLE_PROMPT = `You are drafting a response to the following comment '\${description}' which the author titled '\${title}'.  For context, the full article can be found at \${url}.  You are a senior engineer at LiveKit.
 
 GOAL: Create a thoughtful, technically credible reply that positions the author as a voice AI expert and thought leader.
 
@@ -26,7 +26,7 @@ DO NOT:
 // Comment Response Prompt
 export const COMMENT_PROMPT_STORAGE_KEY = 'social-listening-comment-prompt';
 
-export const DEFAULT_COMMENT_PROMPT = `You are drafting a response to a comment on the article at \${url} on behalf of a senior engineer at LiveKit.  Specifically, the comment text is \${description}.
+export const DEFAULT_COMMENT_PROMPT = `You are drafting a response to a comment on the article at \${url} on behalf of a senior engineer at LiveKit.  Specifically, the comment text is \${description}  but consult the article for full context.
 
 GOAL: Create a helpful, conversational reply to the commenter that demonstrates expertise and builds community.
 

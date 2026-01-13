@@ -828,6 +828,18 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, is
               {entry.link}
             </a>
           )}
+          
+          {/* Show parent article link for comments */}
+          {isComment && entry.link && getRedditArticleUrl(entry.link) && (
+            <a
+              href={getRedditArticleUrl(entry.link)!}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.entryParentUrl}
+            >
+              Parent article: {getRedditArticleUrl(entry.link)}
+            </a>
+          )}
 
           {/* AI Generated Response Section - not shown for dummy parent entries */}
           {(status === 'to_process' || hasAiResponse) && !isDummyParent && (

@@ -351,6 +351,20 @@
   text-decoration: underline;
 }
 
+.entryParentUrl {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  word-break: break-all;
+  margin-top: 0.25rem;
+}
+
+.entryParentUrl:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 /* AI Section */
 .aiSection {
   margin-top: 1rem;
