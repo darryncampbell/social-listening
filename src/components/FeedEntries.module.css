@@ -69,6 +69,30 @@
   overflow: hidden;
 }
 
+/* Indented entries for comment threads */
+.entryIndented {
+  margin-left: 2rem;
+  border-left: 3px solid var(--accent);
+  position: relative;
+}
+
+.entryIndented::before {
+  content: '';
+  position: absolute;
+  left: -2rem;
+  top: 50%;
+  width: 1.5rem;
+  height: 2px;
+  background: var(--border);
+}
+
+/* Dummy parent entry styling */
+.entryDummyParent {
+  background: var(--bg-tertiary);
+  border-style: dashed;
+  opacity: 0.85;
+}
+
 .entryHeader {
   display: flex;
   align-items: center;

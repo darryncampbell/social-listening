@@ -53,6 +53,30 @@ function isRedditComment(url: string): boolean {
   return url.includes('reddit.com') && url.includes('/c/');
 }
 
+/**
+ * Extract the parent article ID from a Reddit URL
+ * Example: https://www.reddit.com/r/voiceagents/comments/1q8xhqn/c/nz2dqt2
+ * Returns: "1q8xhqn"
+ */
+function getRedditArticleId(url: string): string | null {
+  if (!url) return null;
+  // Match /comments/ARTICLE_ID/ pattern
+  const match = url.match(/\/comments\/([a-zA-Z0-9]+)/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Get the base article URL from a Reddit URL (removing comment part)
+ * Example: https://www.reddit.com/r/voiceagents/comments/1q8xhqn/c/nz2dqt2
+ * Returns: https://www.reddit.com/r/voiceagents/comments/1q8xhqn/
+ */
+function getRedditArticleUrl(url: string): string | null {
+  if (!url) return null;
+  // Match everything up to and including /comments/ARTICLE_ID/
+  const match = url.match(/(.*\/comments\/[a-zA-Z0-9]+\/)/);
+  return match ? match[1] : null;
+}
+
 import { TagFilters, getFeedFilterState } from '@/utils/tagFilter';
 
 interface FeedEntriesProps {
@@ -63,9 +87,9 @@ interface FeedEntriesProps {
 }
 
 interface CategorizedEntries {
-  toProcess: RssEntry[];
-  processed: RssEntry[];
-  ignored: RssEntry[];
+  toProcess: EntryWithThread[];
+  processed: EntryWithThread[];
+  ignored: EntryWithThread[];
 }
 
 /**
@@ -188,6 +212,113 @@ function sortByDateDescending(entries: RssEntry[]): RssEntry[] {
   return [...entries].sort((a, b) => getEntryDate(b) - getEntryDate(a));
 }
 
+/**
+ * Group Reddit comments under their parent articles.
+ * - If the parent article exists in the list, comments appear right after it
+ * - If the parent article doesn't exist, a dummy placeholder entry is created
+ * Returns entries with an additional isCommentThread property for indentation
+ */
+interface EntryWithThread extends RssEntry {
+  isCommentThread?: boolean;
+  isDummyParent?: boolean;
+}
+
+function groupCommentsUnderArticles(entries: RssEntry[], listName: string): EntryWithThread[] {
+  // Build a map of article IDs to their entries
+  const articleIdToEntry = new Map<string, RssEntry>();
+  const commentsByArticleId = new Map<string, RssEntry[]>();
+  const nonRedditEntries: RssEntry[] = [];
+  
+  for (const entry of entries) {
+    const articleId = getRedditArticleId(entry.link);
+    
+    if (!articleId) {
+      // Not a Reddit URL
+      nonRedditEntries.push(entry);
+      continue;
+    }
+    
+    if (isRedditComment(entry.link)) {
+      // This is a comment - group by parent article ID
+      if (!commentsByArticleId.has(articleId)) {
+        commentsByArticleId.set(articleId, []);
+      }
+      commentsByArticleId.get(articleId)!.push(entry);
+    } else {
+      // This is an article
+      articleIdToEntry.set(articleId, entry);
+    }
+  }
+  
+  // Build result: articles with their comments grouped below them
+  const result: EntryWithThread[] = [];
+  const processedArticleIds = new Set<string>();
+  
+  // First, add non-Reddit entries
+  for (const entry of nonRedditEntries) {
+    result.push(entry);
+  }
+  
+  // Process each article and its comments
+  for (const [articleId, article] of articleIdToEntry) {
+    result.push(article);
+    processedArticleIds.add(articleId);
+    
+    // Add any comments for this article
+    const comments = commentsByArticleId.get(articleId);
+    if (comments) {
+      // Sort comments by date descending
+      comments.sort((a, b) => getEntryDate(b) - getEntryDate(a));
+      for (const comment of comments) {
+        result.push({ ...comment, isCommentThread: true });
+      }
+    }
+  }
+  
+  // Handle orphan comments (parent article not in list)
+  for (const [articleId, comments] of commentsByArticleId) {
+    if (processedArticleIds.has(articleId)) continue;
+    
+    // Sort comments by date descending
+    comments.sort((a, b) => getEntryDate(b) - getEntryDate(a));
+    
+    // Create a dummy parent entry
+    const firstComment = comments[0];
+    const articleUrl = getRedditArticleUrl(firstComment.link);
+    const dummyParent: EntryWithThread = {
+      id: `dummy-article-${articleId}`,
+      title: `Reddit Thread (${comments.length} comment${comments.length > 1 ? 's' : ''})`,
+      description: `Parent article not in '${listName}' list - click to view the original thread`,
+      link: articleUrl || firstComment.link.replace(/\/c\/.*$/, '/'),
+      publishedDate: firstComment.publishedDate,
+      feedTitle: firstComment.feedTitle,
+      feedId: firstComment.feedId,
+      rawXml: '', // Dummy entries don't have raw XML
+      isDummyParent: true,
+    };
+    
+    result.push(dummyParent);
+    
+    // Add comments under the dummy parent
+    for (const comment of comments) {
+      result.push({ ...comment, isCommentThread: true });
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Sort entries with cross-post grouping AND comment threading
+ */
+function sortWithGrouping(entries: RssEntry[], crossPostDescriptions: Set<string>, listName: string): EntryWithThread[] {
+  // First apply cross-post grouping and date sorting
+  const sortedEntries = sortWithCrossPostGrouping(entries, crossPostDescriptions);
+  
+  // Then apply comment threading
+  return groupCommentsUnderArticles(sortedEntries, listName);
+}
+
 function categorizeEntriesFromSource(entries: RssEntry[], crossPostDescriptions: Set<string>): CategorizedEntries {
   const toProcess: RssEntry[] = [];
   const processed: RssEntry[] = [];
@@ -207,11 +338,11 @@ function categorizeEntriesFromSource(entries: RssEntry[], crossPostDescriptions:
     }
   }
 
-  // Sort each category by date, grouping cross-posts together
+  // Sort each category by date, grouping cross-posts and comments together
   return {
-    toProcess: sortWithCrossPostGrouping(toProcess, crossPostDescriptions),
-    processed: sortWithCrossPostGrouping(processed, crossPostDescriptions),
-    ignored: sortWithCrossPostGrouping(ignored, crossPostDescriptions),
+    toProcess: sortWithGrouping(toProcess, crossPostDescriptions, 'To Process'),
+    processed: sortWithGrouping(processed, crossPostDescriptions, 'Done'),
+    ignored: sortWithGrouping(ignored, crossPostDescriptions, 'Ignored'),
   };
 }
 
@@ -371,7 +502,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
 interface EntryTableProps {
   id: string;
   title: string;
-  entries: RssEntry[];
+  entries: EntryWithThread[];
   status: EntryStatus;
   onAction: (entryId: string, action: 'process' | 'ignore' | 'restore') => void;
   crossPostDescriptions: Set<string>;
@@ -397,6 +528,8 @@ function EntryTable({ id, title, entries, status, onAction, crossPostDescription
             onAction={onAction}
             crossPostDescriptions={crossPostDescriptions}
             interest={interest}
+            isIndented={entry.isCommentThread}
+            isDummyParent={entry.isDummyParent}
           />
         ))}
       </div>
@@ -405,14 +538,16 @@ function EntryTable({ id, title, entries, status, onAction, crossPostDescription
 }
 
 interface EntryRowProps {
-  entry: RssEntry;
+  entry: EntryWithThread;
   status: EntryStatus;
   onAction: (entryId: string, action: 'process' | 'ignore' | 'restore') => void;
   crossPostDescriptions: Set<string>;
   interest: string;
+  isIndented?: boolean;
+  isDummyParent?: boolean;
 }
 
-function EntryRow({ entry, status, onAction, crossPostDescriptions, interest }: EntryRowProps) {
+function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, isIndented, isDummyParent }: EntryRowProps) {
   const [showRawDetails, setShowRawDetails] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | undefined>(undefined);
   const [generating, setGenerating] = useState(false);
@@ -562,8 +697,13 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest }: 
     (displayDescription || '').toLowerCase().includes(interestLower);
   const isGitHub = entry.link?.includes('github.com/livekit') ?? false;
 
+  // Build class names for the entry
+  const entryClassNames = [styles.entry];
+  if (isIndented) entryClassNames.push(styles.entryIndented);
+  if (isDummyParent) entryClassNames.push(styles.entryDummyParent);
+
   return (
-    <div className={styles.entry}>
+    <div className={entryClassNames.join(' ')}>
       <div className={styles.entryHeader}>
         <div className={styles.entryHeaderLeft}>
           <span className={styles.entryFeed}>
@@ -608,7 +748,7 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest }: 
           )}
         </div>
         <div className={styles.entryActions}>
-          {status === 'to_process' && (
+          {status === 'to_process' && !isDummyParent && (
             <>
               <button
                 className={`${styles.actionBtn} ${styles.ignoreBtn}`}
@@ -626,7 +766,7 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest }: 
               </button>
             </>
           )}
-          {(status === 'processed' || status === 'ignored') && (
+          {(status === 'processed' || status === 'ignored') && !isDummyParent && (
             <button
               className={`${styles.actionBtn} ${styles.restoreBtn}`}
               onClick={handleRestore}
@@ -689,8 +829,8 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest }: 
             </a>
           )}
 
-          {/* AI Generated Response Section */}
-          {(status === 'to_process' || hasAiResponse) && (
+          {/* AI Generated Response Section - not shown for dummy parent entries */}
+          {(status === 'to_process' || hasAiResponse) && !isDummyParent && (
             <div className={styles.aiSection}>
               {aiError && (
                 <div className={styles.aiError}>{aiError}</div>
