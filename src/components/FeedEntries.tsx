@@ -649,9 +649,9 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest }: 
             {entry.publishedDate && (
               <span className={styles.entryDate}>{formatDate(entry.publishedDate)}</span>
             )}
-            {entry.rawDetails?.lastCommentTime && (
+            {typeof entry.rawDetails?.lastCommentTime === 'string' && entry.rawDetails.lastCommentTime && (
               <span className={styles.entryLastComment}>
-                Last activity: {formatDate(entry.rawDetails.lastCommentTime as string)}
+                Last activity: {formatDate(entry.rawDetails.lastCommentTime)}
               </span>
             )}
             {entry.og?.ogSiteName && (
