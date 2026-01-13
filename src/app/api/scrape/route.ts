@@ -339,8 +339,10 @@ export async function POST(request: NextRequest) {
 
           // Only add if we have meaningful content
           if (title || description.length > 20) {
+            // Use link as stable ID (or fallback to title hash if no link)
+            const stableId = link || `skool-${title}-${author}`;
             results.push({
-              id: `skool-${index}-${Date.now()}`,
+              id: stableId,
               author,
               authorAvatar,
               title: title || description.substring(0, 100),
