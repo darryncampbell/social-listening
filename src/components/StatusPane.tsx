@@ -8,6 +8,8 @@ import PromptModal, { PromptType } from './PromptModal';
 import { syncAllFeeds, RssEntry } from '@/utils/rssParser';
 import { TagFilters, TagType, ContentTagType, StatusTagType, CONTENT_TAG_LABELS, STATUS_TAG_LABELS, toggleFilterState, getFeedFilterState } from '@/utils/tagFilter';
 import { getInterest } from '@/utils/interestConfig';
+import { getSkoolSources, SkoolSource } from '@/utils/skoolConfig';
+import { SkoolPost } from '@/app/api/scrape/route';
 
 const FEEDS_STORAGE_KEY = 'social-listening-feeds';
 const SYNC_TIME_STORAGE_KEY = 'social-listening-last-sync';
@@ -29,6 +31,7 @@ interface StatusPaneProps {
 export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, onTagFiltersChange, entries }: StatusPaneProps) {
   const [feedCount, setFeedCount] = useState<number>(0);
   const [feeds, setFeeds] = useState<Feed[]>([]);
+  const [skoolSources, setSkoolSources] = useState<SkoolSource[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [lastSyncDate, setLastSyncDate] = useState<Date | null>(null);
   const [isSyncStale, setIsSyncStale] = useState(false);
@@ -76,6 +79,10 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
         setFeedCount(0);
       }
     }
+
+    // Load Skool sources
+    const sources = getSkoolSources();
+    setSkoolSources(sources);
 
     // Load last sync time
     const storedSyncTime = localStorage.getItem(SYNC_TIME_STORAGE_KEY);
@@ -150,8 +157,70 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
     return count;
   }, [tagFilters]);
 
+  // Convert Skool posts to RssEntry format
+  const convertSkoolPostToRssEntry = (post: SkoolPost): RssEntry => {
+    // Create a description that includes all the scraped metadata
+    const metaInfo = [
+      post.category ? `[${post.category}]` : '',
+      `👍 ${post.likes}`,
+      `💬 ${post.comments}`,
+      post.lastCommentTime ? `Last comment: ${post.lastCommentTime}` : '',
+    ].filter(Boolean).join(' • ');
+
+    const fullDescription = post.description 
+      ? `${post.description}\n\n${metaInfo}`
+      : metaInfo;
+
+    return {
+      id: post.id,
+      feedId: `skool-${post.sourceUrl}`,
+      feedTitle: post.sourceName,
+      rawXml: '',
+      link: post.link,
+      title: post.title || `Post by ${post.author}`,
+      publishedDate: post.date || new Date().toISOString(),
+      description: fullDescription,
+      og: post.authorAvatar ? {
+        ogImage: post.authorAvatar,
+        ogSiteName: 'Skool',
+      } : undefined,
+      rawDetails: {
+        author: post.author,
+        authorAvatar: post.authorAvatar,
+        category: post.category,
+        likes: post.likes,
+        comments: post.comments,
+        lastCommentTime: post.lastCommentTime,
+        isPinned: post.isPinned,
+        originalDescription: post.description,
+      },
+    };
+  };
+
+  const scrapeSkoolSource = async (source: SkoolSource): Promise<{ entries: RssEntry[]; error?: string }> => {
+    try {
+      const response = await fetch('/api/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: source.url, sourceName: source.name }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        return { entries: [], error: data.error || 'Failed to scrape' };
+      }
+
+      const data = await response.json();
+      const entries = (data.posts || []).map(convertSkoolPostToRssEntry);
+      return { entries };
+    } catch (error) {
+      console.error('Skool scrape error:', error);
+      return { entries: [], error: 'Failed to scrape Skool community' };
+    }
+  };
+
   const handleSync = async () => {
-    if (feeds.length === 0) {
+    if (feeds.length === 0 && skoolSources.length === 0) {
       return;
     }
 
@@ -159,7 +228,27 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
     onSyncStart?.();
 
     try {
-      const { entries, errors } = await syncAllFeeds(feeds);
+      // Sync RSS feeds
+      const { entries: rssEntries, errors: rssErrors } = feeds.length > 0 
+        ? await syncAllFeeds(feeds)
+        : { entries: [], errors: [] };
+
+      // Scrape Skool sources in parallel
+      const skoolResults = await Promise.all(
+        skoolSources.map(source => scrapeSkoolSource(source))
+      );
+
+      // Combine entries and errors
+      const skoolEntries = skoolResults.flatMap(r => r.entries);
+      const skoolErrors = skoolResults
+        .filter(r => r.error)
+        .map((r, i) => ({ 
+          feedTitle: skoolSources[i]?.name || 'Skool', 
+          error: r.error! 
+        }));
+
+      const allEntries = [...rssEntries, ...skoolEntries];
+      const allErrors = [...rssErrors, ...skoolErrors];
 
       // Update last sync time
       const now = new Date();
@@ -167,7 +256,7 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
       setLastSyncDate(now);
       setLastSyncTime(now.toLocaleString());
 
-      onSyncComplete?.(entries, errors);
+      onSyncComplete?.(allEntries, allErrors);
     } catch (error) {
       console.error('Sync failed:', error);
       onSyncComplete?.([], [{ feedTitle: 'Sync', error: 'Failed to sync feeds' }]);
@@ -207,7 +296,7 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
             className={`${styles.syncButton} ${syncing ? styles.syncing : ''}`}
             onClick={handleSync}
             title="Sync"
-            disabled={syncing || feedCount === 0}
+            disabled={syncing || (feedCount === 0 && skoolSources.length === 0)}
           >
             <FontAwesomeIcon icon={faSync} spin={syncing} />
           </button>

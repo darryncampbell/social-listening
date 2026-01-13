@@ -18,6 +18,33 @@ import { getInterest } from '@/utils/interestConfig';
 import styles from './FeedEntries.module.css';
 
 /**
+ * Format a date string to a user-friendly format like "9th January 2026 15:50"
+ */
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return dateString;
+  
+  const day = date.getDate();
+  const suffix = getDaySuffix(day);
+  const month = date.toLocaleString('en-GB', { month: 'long' });
+  const year = date.getFullYear();
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  
+  return `${day}${suffix} ${month} ${year} ${hours}:${minutes}`;
+}
+
+function getDaySuffix(day: number): string {
+  if (day >= 11 && day <= 13) return 'th';
+  switch (day % 10) {
+    case 1: return 'st';
+    case 2: return 'nd';
+    case 3: return 'rd';
+    default: return 'th';
+  }
+}
+
+/**
  * Detect if an entry is a Reddit comment based on URL pattern
  * Reddit comment URLs contain 'reddit.com' and '/c/'
  */
@@ -83,7 +110,10 @@ function findCrossPostDescriptions(entries: RssEntry[]): Set<string> {
 }
 
 function getEntryDate(entry: RssEntry): number {
-  const date = entry.publishedDate ? new Date(entry.publishedDate).getTime() : 0;
+  // Use lastCommentTime if available (for scraped content like Skool), otherwise use publishedDate
+  const lastCommentTime = entry.rawDetails?.lastCommentTime as string | undefined;
+  const dateString = lastCommentTime || entry.publishedDate;
+  const date = dateString ? new Date(dateString).getTime() : 0;
   return !isNaN(date) ? date : 0;
 }
 
@@ -383,7 +413,7 @@ interface EntryRowProps {
 }
 
 function EntryRow({ entry, status, onAction, crossPostDescriptions, interest }: EntryRowProps) {
-  const [showRawXml, setShowRawXml] = useState(false);
+  const [showRawDetails, setShowRawDetails] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | undefined>(undefined);
   const [generating, setGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -617,7 +647,12 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest }: 
         <div className={styles.entryText}>
           <div className={styles.entryMeta}>
             {entry.publishedDate && (
-              <span className={styles.entryDate}>{entry.publishedDate}</span>
+              <span className={styles.entryDate}>{formatDate(entry.publishedDate)}</span>
+            )}
+            {entry.rawDetails?.lastCommentTime && (
+              <span className={styles.entryLastComment}>
+                Last activity: {formatDate(entry.rawDetails.lastCommentTime as string)}
+              </span>
             )}
             {entry.og?.ogSiteName && (
               <span className={styles.entrySiteName}>{entry.og.ogSiteName}</span>
@@ -715,15 +750,19 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest }: 
       <div className={styles.entryFooter}>
         <button
           className={styles.toggleXmlBtn}
-          onClick={() => setShowRawXml(!showRawXml)}
+          onClick={() => setShowRawDetails(!showRawDetails)}
         >
-          <FontAwesomeIcon icon={showRawXml ? faChevronUp : faChevronDown} />
-          <span>{showRawXml ? 'Hide' : 'Show'} Raw XML</span>
+          <FontAwesomeIcon icon={showRawDetails ? faChevronUp : faChevronDown} />
+          <span>{showRawDetails ? 'Hide' : 'Show'} Raw Details</span>
         </button>
       </div>
 
-      {showRawXml && (
-        <pre className={styles.entryXml}>{entry.rawXml}</pre>
+      {showRawDetails && (
+        <pre className={styles.entryXml}>{
+          entry.rawDetails 
+            ? JSON.stringify(entry.rawDetails, null, 2)
+            : entry.rawXml || JSON.stringify(entry, null, 2)
+        }</pre>
       )}
     </div>
   );

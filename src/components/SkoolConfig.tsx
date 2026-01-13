@@ -1,0 +1,324 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faSave, faEdit, faTrash, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { getSkoolSources, saveSkoolSources, isValidSkoolUrl, SkoolSource } from '@/utils/skoolConfig';
+import ConfirmModal from './ConfirmModal';
+import styles from './SkoolConfig.module.css';
+
+export default function SkoolConfig() {
+  const [sources, setSources] = useState<SkoolSource[]>([]);
+  const [mounted, setMounted] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showNewRow, setShowNewRow] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newUrl, setNewUrl] = useState('');
+  const [newNameError, setNewNameError] = useState('');
+  const [newUrlError, setNewUrlError] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editUrl, setEditUrl] = useState('');
+  const [editNameError, setEditNameError] = useState('');
+  const [editUrlError, setEditUrlError] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<SkoolSource | null>(null);
+
+  useEffect(() => {
+    setSources(getSkoolSources());
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted) {
+      saveSkoolSources(sources);
+    }
+  }, [sources, mounted]);
+
+  const handleAddNew = () => {
+    setShowNewRow(true);
+    setNewName('');
+    setNewUrl('');
+    setNewNameError('');
+    setNewUrlError('');
+  };
+
+  const handleSaveNew = () => {
+    let hasError = false;
+
+    if (!newName.trim()) {
+      setNewNameError('Please enter a name');
+      hasError = true;
+    } else {
+      setNewNameError('');
+    }
+
+    const urlValidation = isValidSkoolUrl(newUrl.trim());
+    if (!newUrl.trim()) {
+      setNewUrlError('Please enter a URL');
+      hasError = true;
+    } else if (!urlValidation.valid) {
+      setNewUrlError(urlValidation.error || 'Invalid URL');
+      hasError = true;
+    } else {
+      setNewUrlError('');
+    }
+
+    if (hasError) return;
+
+    setSources((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), name: newName.trim(), url: newUrl.trim() }
+    ]);
+    setShowNewRow(false);
+    setNewName('');
+    setNewUrl('');
+  };
+
+  const handleCancelNew = () => {
+    setShowNewRow(false);
+    setNewName('');
+    setNewUrl('');
+    setNewNameError('');
+    setNewUrlError('');
+  };
+
+  const handleEdit = (source: SkoolSource) => {
+    setEditingId(source.id);
+    setEditName(source.name);
+    setEditUrl(source.url);
+    setEditNameError('');
+    setEditUrlError('');
+  };
+
+  const handleSaveEdit = (id: string) => {
+    let hasError = false;
+
+    if (!editName.trim()) {
+      setEditNameError('Please enter a name');
+      hasError = true;
+    } else {
+      setEditNameError('');
+    }
+
+    const urlValidation = isValidSkoolUrl(editUrl.trim());
+    if (!editUrl.trim()) {
+      setEditUrlError('Please enter a URL');
+      hasError = true;
+    } else if (!urlValidation.valid) {
+      setEditUrlError(urlValidation.error || 'Invalid URL');
+      hasError = true;
+    } else {
+      setEditUrlError('');
+    }
+
+    if (hasError) return;
+
+    setSources((prev) =>
+      prev.map((s) =>
+        s.id === id ? { ...s, name: editName.trim(), url: editUrl.trim() } : s
+      )
+    );
+    setEditingId(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditName('');
+    setEditUrl('');
+    setEditNameError('');
+    setEditUrlError('');
+  };
+
+  const handleDelete = (source: SkoolSource) => {
+    setDeleteConfirm(source);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirm) {
+      setSources((prev) => prev.filter((s) => s.id !== deleteConfirm.id));
+      setDeleteConfirm(null);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, action: () => void) => {
+    if (e.key === 'Enter') {
+      action();
+    } else if (e.key === 'Escape') {
+      if (showNewRow) handleCancelNew();
+      if (editingId) handleCancelEdit();
+    }
+  };
+
+  if (!mounted) return null;
+
+  return (
+    <div className={styles.container}>
+      <h2 className={styles.title}>Skool Community Sources</h2>
+      <p className={styles.description}>
+        Add Skool.com community URLs to scrape posts during sync. Only skool.com URLs are supported.
+      </p>
+
+      <div className={styles.list}>
+        {sources.map((source) => (
+          <div key={source.id} className={styles.row}>
+            {editingId === source.id ? (
+              <>
+                <div className={styles.fields}>
+                  <div className={`${styles.inputWrapper} ${styles.nameWrapper}`}>
+                    <input
+                      type="text"
+                      className={`${styles.input} ${editNameError ? styles.inputError : ''}`}
+                      placeholder="Community name..."
+                      value={editName}
+                      onChange={(e) => {
+                        setEditName(e.target.value);
+                        if (editNameError) setEditNameError('');
+                      }}
+                      onKeyDown={(e) => handleKeyDown(e, () => handleSaveEdit(source.id))}
+                      autoFocus
+                    />
+                    {editNameError && <span className={styles.error}>{editNameError}</span>}
+                  </div>
+                  <div className={`${styles.inputWrapper} ${styles.urlWrapper}`}>
+                    <input
+                      type="url"
+                      className={`${styles.input} ${editUrlError ? styles.inputError : ''}`}
+                      placeholder="https://www.skool.com/..."
+                      value={editUrl}
+                      onChange={(e) => {
+                        setEditUrl(e.target.value);
+                        if (editUrlError) setEditUrlError('');
+                      }}
+                      onKeyDown={(e) => handleKeyDown(e, () => handleSaveEdit(source.id))}
+                    />
+                    {editUrlError && <span className={styles.error}>{editUrlError}</span>}
+                  </div>
+                </div>
+                <div className={styles.actions}>
+                  <button
+                    className={`${styles.actionButton} ${styles.deleteButton}`}
+                    onClick={handleCancelEdit}
+                    title="Cancel"
+                  >
+                    ✕
+                  </button>
+                  <button
+                    className={styles.actionButton}
+                    onClick={() => handleSaveEdit(source.id)}
+                    title="Save"
+                  >
+                    <FontAwesomeIcon icon={faSave} />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={styles.fields}>
+                  <div className={`${styles.inputWrapper} ${styles.nameWrapper}`}>
+                    <input
+                      type="text"
+                      className={styles.input}
+                      value={source.name}
+                      disabled
+                    />
+                  </div>
+                  <div className={`${styles.inputWrapper} ${styles.urlWrapper}`}>
+                    <input
+                      type="url"
+                      className={styles.input}
+                      value={source.url}
+                      disabled
+                    />
+                  </div>
+                </div>
+                <div className={styles.actions}>
+                  <button
+                    className={`${styles.actionButton} ${styles.deleteButton}`}
+                    onClick={() => handleDelete(source)}
+                    title="Delete"
+                  >
+                    <FontAwesomeIcon icon={faTrash} />
+                  </button>
+                  <button
+                    className={styles.actionButton}
+                    onClick={() => handleEdit(source)}
+                    title="Edit"
+                  >
+                    <FontAwesomeIcon icon={faEdit} />
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+
+        {showNewRow && (
+          <div className={styles.row}>
+            <div className={styles.fields}>
+              <div className={`${styles.inputWrapper} ${styles.nameWrapper}`}>
+                <input
+                  type="text"
+                  className={`${styles.input} ${newNameError ? styles.inputError : ''}`}
+                  placeholder="Community name..."
+                  value={newName}
+                  onChange={(e) => {
+                    setNewName(e.target.value);
+                    if (newNameError) setNewNameError('');
+                  }}
+                  onKeyDown={(e) => handleKeyDown(e, handleSaveNew)}
+                  autoFocus
+                />
+                {newNameError && <span className={styles.error}>{newNameError}</span>}
+              </div>
+              <div className={`${styles.inputWrapper} ${styles.urlWrapper}`}>
+                <input
+                  type="url"
+                  className={`${styles.input} ${newUrlError ? styles.inputError : ''}`}
+                  placeholder="https://www.skool.com/..."
+                  value={newUrl}
+                  onChange={(e) => {
+                    setNewUrl(e.target.value);
+                    if (newUrlError) setNewUrlError('');
+                  }}
+                  onKeyDown={(e) => handleKeyDown(e, handleSaveNew)}
+                />
+                {newUrlError && <span className={styles.error}>{newUrlError}</span>}
+              </div>
+            </div>
+            <div className={styles.actions}>
+              <button
+                className={`${styles.actionButton} ${styles.deleteButton}`}
+                onClick={handleCancelNew}
+                title="Cancel"
+              >
+                ✕
+              </button>
+              <button
+                className={styles.actionButton}
+                onClick={handleSaveNew}
+                title="Save"
+              >
+                <FontAwesomeIcon icon={faSave} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!showNewRow && (
+          <button className={styles.addButton} onClick={handleAddNew}>
+            <FontAwesomeIcon icon={faPlus} />
+            <span>Add Skool Community</span>
+          </button>
+        )}
+      </div>
+
+      {deleteConfirm && (
+        <ConfirmModal
+          title="Delete Skool Source"
+          message={`Are you sure you want to delete "${deleteConfirm.name}"? This action cannot be undone.`}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteConfirm(null)}
+        />
+      )}
+    </div>
+  );
+}

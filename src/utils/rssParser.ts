@@ -18,6 +18,8 @@ export interface RssEntry {
   description: string;
   og?: OpenGraphData;
   ogLoading?: boolean;
+  // For scraped content (e.g., Skool), stores the original extracted data
+  rawDetails?: Record<string, unknown>;
 }
 
 export interface ParsedFeed {
@@ -144,7 +146,7 @@ function extractPublishedDate(entryXml: string): string {
   for (const tag of dateTags) {
     const dateStr = extractTagContent(entryXml, tag);
     if (dateStr) {
-      return formatDate(dateStr);
+      return normalizeDate(dateStr);
     }
   }
 
@@ -169,15 +171,15 @@ function extractDescription(entryXml: string): string {
 }
 
 /**
- * Format a date string to locale format
+ * Parse and normalize a date string to ISO format for consistent storage
  */
-function formatDate(dateStr: string): string {
+function normalizeDate(dateStr: string): string {
   try {
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) {
       return dateStr;
     }
-    return date.toLocaleString();
+    return date.toISOString();
   } catch {
     return dateStr;
   }
