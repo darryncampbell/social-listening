@@ -10,6 +10,45 @@ import styles from './page.module.css';
 
 const TAG_FILTERS_STORAGE_KEY = 'social-listening-tag-filters';
 
+/**
+ * Deduplicate entries by URL, keeping the entry with the most recent date.
+ * This handles cases where the same article appears multiple times in feeds.
+ */
+function deduplicateEntries(entries: RssEntry[]): RssEntry[] {
+  const urlMap = new Map<string, RssEntry>();
+  
+  for (const entry of entries) {
+    const url = entry.link;
+    if (!url) {
+      // Keep entries without URLs as-is (shouldn't happen, but be safe)
+      continue;
+    }
+    
+    const existing = urlMap.get(url);
+    if (!existing) {
+      urlMap.set(url, entry);
+    } else {
+      // Keep the entry with the more recent date
+      const existingDate = new Date(existing.publishedDate || 0).getTime();
+      const newDate = new Date(entry.publishedDate || 0).getTime();
+      
+      if (newDate > existingDate) {
+        // New entry is more recent - but preserve OG data from existing if available
+        urlMap.set(url, {
+          ...entry,
+          og: entry.og || existing.og,
+          ogLoading: entry.og ? false : existing.ogLoading,
+        });
+      } else if (existing.og && !entry.og) {
+        // Keep existing (it's newer or same), but nothing to do
+      }
+      // Otherwise keep existing (it's newer)
+    }
+  }
+  
+  return Array.from(urlMap.values());
+}
+
 export default function Home() {
   const [entries, setEntries] = useState<RssEntry[]>([]);
   const [errors, setErrors] = useState<Array<{ feedTitle: string; error: string }>>([]);
@@ -20,7 +59,13 @@ export default function Home() {
   // Load entries and tag filters from localStorage on mount
   useEffect(() => {
     const storedEntries = loadEntries();
-    setEntries(storedEntries);
+    // Deduplicate in case there are existing duplicates from before this fix
+    const deduplicatedEntries = deduplicateEntries(storedEntries);
+    setEntries(deduplicatedEntries);
+    // Save back if we removed duplicates
+    if (deduplicatedEntries.length < storedEntries.length) {
+      saveEntries(deduplicatedEntries);
+    }
     
     // Load tag filters
     const storedFilters = localStorage.getItem(TAG_FILTERS_STORAGE_KEY);
@@ -113,15 +158,18 @@ export default function Home() {
       return entry;
     });
 
-    setEntries(entriesWithExistingOg);
+    // Deduplicate entries by URL, keeping the most recent version
+    const deduplicatedEntries = deduplicateEntries(entriesWithExistingOg);
+
+    setEntries(deduplicatedEntries);
     setErrors(newErrors);
     setLoading(false);
     
     // Save entries immediately (without waiting for OG data)
-    saveEntries(entriesWithExistingOg);
+    saveEntries(deduplicatedEntries);
 
     // Start fetching OG data asynchronously for entries that need it
-    fetchOgDataForEntries(entriesWithExistingOg);
+    fetchOgDataForEntries(deduplicatedEntries);
   }, [fetchOgDataForEntries]);
 
   if (!mounted) {

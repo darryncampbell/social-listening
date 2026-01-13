@@ -115,10 +115,20 @@ interface CategorizedEntries {
 /**
  * Sort entries by published date, newest first
  */
-// Descriptions that should never be considered as cross-posts
-const CROSS_POST_EXCEPTIONS = new Set([
-  'keyword was found in submission title.',
-]);
+// Patterns in descriptions that indicate F5 Bot entries which should never be considered as cross-posts
+const CROSS_POST_EXCEPTION_PATTERNS = [
+  'keyword was found in',
+  'keyword was found in submission title',
+  'keyword was found in comment',
+];
+
+/**
+ * Check if a description should be excluded from cross-post detection
+ */
+function isCrossPostException(description: string): boolean {
+  const lowerDesc = description.toLowerCase();
+  return CROSS_POST_EXCEPTION_PATTERNS.some(pattern => lowerDesc.includes(pattern));
+}
 
 /**
  * Detect cross-posted entries (same description, different URLs)
@@ -131,8 +141,8 @@ function findCrossPostDescriptions(entries: RssEntry[]): Set<string> {
     const description = (entry.og?.ogDescription || entry.description || '').trim().toLowerCase();
     if (!description) continue;
     
-    // Skip descriptions that are in the exceptions list
-    if (CROSS_POST_EXCEPTIONS.has(description)) continue;
+    // Skip descriptions that match F5 Bot patterns (these aren't true cross-posts)
+    if (isCrossPostException(description)) continue;
     
     if (!descriptionToUrls.has(description)) {
       descriptionToUrls.set(description, new Set());
@@ -166,69 +176,10 @@ function getEntryDescription(entry: RssEntry): string {
 }
 
 /**
- * Sort entries by date descending, but group cross-posted articles together.
- * Cross-post groups are positioned by their newest entry, and all entries
- * in the group appear consecutively, sorted by date descending within the group.
+ * Sort entries by date descending.
+ * Cross-post detection is still done for visual indicators, but entries are not grouped.
  */
-function sortWithCrossPostGrouping(entries: RssEntry[], crossPostDescriptions: Set<string>): RssEntry[] {
-  // Separate cross-posted and non-cross-posted entries
-  const crossPostGroups = new Map<string, RssEntry[]>();
-  const nonCrossPost: RssEntry[] = [];
-  
-  for (const entry of entries) {
-    const description = getEntryDescription(entry);
-    if (description && crossPostDescriptions.has(description)) {
-      if (!crossPostGroups.has(description)) {
-        crossPostGroups.set(description, []);
-      }
-      crossPostGroups.get(description)!.push(entry);
-    } else {
-      nonCrossPost.push(entry);
-    }
-  }
-  
-  // Sort entries within each cross-post group by date descending
-  for (const group of crossPostGroups.values()) {
-    group.sort((a, b) => getEntryDate(b) - getEntryDate(a));
-  }
-  
-  // Sort non-cross-posted entries by date descending
-  nonCrossPost.sort((a, b) => getEntryDate(b) - getEntryDate(a));
-  
-  // Create sortable items: each cross-post group as one item, each non-cross-post as one item
-  interface SortableItem {
-    date: number;
-    entries: RssEntry[];
-  }
-  
-  const sortableItems: SortableItem[] = [];
-  
-  // Add cross-post groups (use newest entry's date for group position)
-  for (const group of crossPostGroups.values()) {
-    if (group.length > 0) {
-      sortableItems.push({
-        date: getEntryDate(group[0]), // Already sorted, so first is newest
-        entries: group,
-      });
-    }
-  }
-  
-  // Add non-cross-posted entries individually
-  for (const entry of nonCrossPost) {
-    sortableItems.push({
-      date: getEntryDate(entry),
-      entries: [entry],
-    });
-  }
-  
-  // Sort all items by date descending
-  sortableItems.sort((a, b) => b.date - a.date);
-  
-  // Flatten back to a single array
-  return sortableItems.flatMap(item => item.entries);
-}
-
-function sortByDateDescending(entries: RssEntry[]): RssEntry[] {
+function sortByDate(entries: RssEntry[]): RssEntry[] {
   return [...entries].sort((a, b) => getEntryDate(b) - getEntryDate(a));
 }
 
@@ -247,24 +198,27 @@ function groupCommentsUnderArticles(entries: RssEntry[], listName: string): Entr
   // Build maps for Reddit article/comment grouping
   const articleIdToEntry = new Map<string, RssEntry>();
   const commentsByArticleId = new Map<string, RssEntry[]>();
+  const nonCommentEntries: RssEntry[] = [];
   
-  // First pass: categorize entries
+  // First pass: categorize entries and separate comments from main entries
   for (const entry of entries) {
     const articleId = getRedditArticleId(entry.link);
     
     if (!articleId) {
-      // Not a Reddit URL - will be handled in sorted order below
+      // Not a Reddit URL - add to main entries list
+      nonCommentEntries.push(entry);
       continue;
     }
     
     if (isRedditComment(entry.link)) {
-      // This is a comment - group by parent article ID
+      // This is a comment - store separately, don't add to main list
       if (!commentsByArticleId.has(articleId)) {
         commentsByArticleId.set(articleId, []);
       }
       commentsByArticleId.get(articleId)!.push(entry);
     } else {
-      // This is an article
+      // This is an article - add to main entries list
+      nonCommentEntries.push(entry);
       articleIdToEntry.set(articleId, entry);
     }
   }
@@ -274,23 +228,21 @@ function groupCommentsUnderArticles(entries: RssEntry[], listName: string): Entr
     comments.sort((a, b) => getEntryDate(b) - getEntryDate(a));
   }
   
-  // Build result: preserve original sorted order, but insert comments after their parent articles
+  // Sort main entries (non-comments) by date descending
+  nonCommentEntries.sort((a, b) => getEntryDate(b) - getEntryDate(a));
+  
+  // Build result: iterate through non-comment entries only
+  // Comments are attached to their parent articles without affecting sort order
   const result: EntryWithThread[] = [];
   const processedArticleIds = new Set<string>();
-  const processedCommentIds = new Set<string>();
   
-  // Process entries in their original sorted order
-  for (const entry of entries) {
+  // Process non-comment entries in sorted order
+  for (const entry of nonCommentEntries) {
     const articleId = getRedditArticleId(entry.link);
     
     if (!articleId) {
       // Non-Reddit entry - add in sorted position
       result.push(entry);
-      continue;
-    }
-    
-    if (isRedditComment(entry.link)) {
-      // Skip comments here - they'll be added after their parent article
       continue;
     }
     
@@ -303,88 +255,43 @@ function groupCommentsUnderArticles(entries: RssEntry[], listName: string): Entr
     if (comments) {
       for (const comment of comments) {
         result.push({ ...comment, isCommentThread: true });
-        processedCommentIds.add(comment.id);
       }
     }
   }
   
   // Handle orphan comments (parent article not in list)
-  // Group them by article ID and insert at the position of the first comment
-  const orphanGroups = new Map<string, { position: number; comments: RssEntry[] }>();
-  
-  for (let i = 0; i < entries.length; i++) {
-    const entry = entries[i];
-    if (!isRedditComment(entry.link)) continue;
-    
-    const articleId = getRedditArticleId(entry.link);
-    if (!articleId || processedArticleIds.has(articleId)) continue;
-    
-    if (!orphanGroups.has(articleId)) {
-      orphanGroups.set(articleId, { position: i, comments: [] });
+  // These are comments whose parent article wasn't in this category
+  // Add them at the end with a dummy parent, sorted by the newest comment's date
+  const orphanArticleIds = new Set<string>();
+  for (const [articleId] of commentsByArticleId) {
+    if (!processedArticleIds.has(articleId)) {
+      orphanArticleIds.add(articleId);
     }
-    orphanGroups.get(articleId)!.comments.push(entry);
   }
   
-  // Insert orphan groups at their positions (need to rebuild result to insert at correct positions)
-  if (orphanGroups.size > 0) {
+  // Sort orphan groups by the date of their newest comment
+  const orphanGroups = Array.from(orphanArticleIds).map(articleId => ({
+    articleId,
+    comments: commentsByArticleId.get(articleId)!,
+    newestDate: getEntryDate(commentsByArticleId.get(articleId)![0]) // Already sorted
+  })).sort((a, b) => b.newestDate - a.newestDate);
+  
+  // Insert orphan groups into the result at appropriate positions based on their newest comment's date
+  // Merge orphan groups with the result while maintaining date order
+  if (orphanGroups.length > 0) {
     const finalResult: EntryWithThread[] = [];
-    const orphanInsertPositions = new Map<number, { articleId: string; comments: RssEntry[] }[]>();
+    let resultIndex = 0;
+    let orphanIndex = 0;
     
-    // Track which original positions need orphan insertions
-    for (const [articleId, { position, comments }] of orphanGroups) {
-      if (!orphanInsertPositions.has(position)) {
-        orphanInsertPositions.set(position, []);
-      }
-      orphanInsertPositions.get(position)!.push({ articleId, comments });
-    }
-    
-    // Rebuild result, inserting orphan groups at appropriate positions
-    let originalIndex = 0;
-    for (const entry of result) {
-      // Check if we need to insert orphan groups before this entry
-      // Find the original position of this entry in the input
-      while (originalIndex < entries.length) {
-        const insertions = orphanInsertPositions.get(originalIndex);
-        if (insertions) {
-          for (const { articleId, comments } of insertions) {
-            // Create dummy parent
-            const firstComment = comments[0];
-            const articleUrl = getRedditArticleUrl(firstComment.link);
-            const dummyParent: EntryWithThread = {
-              id: `dummy-article-${articleId}`,
-              title: `Reddit Thread (${comments.length} comment${comments.length > 1 ? 's' : ''})`,
-              description: `Parent article not in '${listName}' list - click to view the original thread`,
-              link: articleUrl || firstComment.link.replace(/\/c\/.*$/, '/'),
-              publishedDate: firstComment.publishedDate,
-              feedTitle: firstComment.feedTitle,
-              feedId: firstComment.feedId,
-              rawXml: '',
-              isDummyParent: true,
-            };
-            
-            finalResult.push(dummyParent);
-            for (const comment of comments) {
-              finalResult.push({ ...comment, isCommentThread: true });
-            }
-          }
-          orphanInsertPositions.delete(originalIndex);
-        }
-        
-        // Move to next original index if this isn't a comment we skipped
-        const origEntry = entries[originalIndex];
-        if (origEntry && origEntry.id === entry.id) {
-          originalIndex++;
-          break;
-        }
-        originalIndex++;
-      }
+    while (resultIndex < result.length || orphanIndex < orphanGroups.length) {
+      // Get the date of the next result entry (use its actual date, not thread date)
+      const nextResultDate = resultIndex < result.length ? getEntryDate(result[resultIndex]) : -Infinity;
+      // Get the date of the next orphan group (use newest comment's date)
+      const nextOrphanDate = orphanIndex < orphanGroups.length ? orphanGroups[orphanIndex].newestDate : -Infinity;
       
-      finalResult.push(entry);
-    }
-    
-    // Add any remaining orphan groups at the end
-    for (const [, insertions] of orphanInsertPositions) {
-      for (const { articleId, comments } of insertions) {
+      if (nextOrphanDate > nextResultDate && orphanIndex < orphanGroups.length) {
+        // Insert orphan group here
+        const { articleId, comments } = orphanGroups[orphanIndex];
         const firstComment = comments[0];
         const articleUrl = getRedditArticleUrl(firstComment.link);
         const dummyParent: EntryWithThread = {
@@ -403,6 +310,13 @@ function groupCommentsUnderArticles(entries: RssEntry[], listName: string): Entr
         for (const comment of comments) {
           finalResult.push({ ...comment, isCommentThread: true });
         }
+        orphanIndex++;
+      } else if (resultIndex < result.length) {
+        // Add next result entry
+        finalResult.push(result[resultIndex]);
+        resultIndex++;
+      } else {
+        break;
       }
     }
     
@@ -416,8 +330,8 @@ function groupCommentsUnderArticles(entries: RssEntry[], listName: string): Entr
  * Sort entries with cross-post grouping AND comment threading
  */
 function sortWithGrouping(entries: RssEntry[], crossPostDescriptions: Set<string>, listName: string): EntryWithThread[] {
-  // First apply cross-post grouping and date sorting
-  const sortedEntries = sortWithCrossPostGrouping(entries, crossPostDescriptions);
+  // Sort entries by date (cross-post grouping removed - was causing ordering issues)
+  const sortedEntries = sortByDate(entries);
   
   // Then apply comment threading
   return groupCommentsUnderArticles(sortedEntries, listName);
