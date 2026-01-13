@@ -5,7 +5,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash, faChevronDown, faRss, faGlobe } from '@fortawesome/free-solid-svg-icons';
 import styles from './StatusPane.module.css';
 import PromptModal, { PromptType } from './PromptModal';
-import { syncAllFeeds, RssEntry } from '@/utils/rssParser';
+import { fetchAndParseFeed, RssEntry } from '@/utils/rssParser';
 import { TagFilters, TagType, ContentTagType, StatusTagType, CONTENT_TAG_LABELS, STATUS_TAG_LABELS, toggleFilterState, getFeedFilterState } from '@/utils/tagFilter';
 import { getInterest } from '@/utils/interestConfig';
 import { getExternalSources, ExternalSource } from '@/utils/externalSourcesConfig';
@@ -40,6 +40,7 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
   const [mounted, setMounted] = useState(false);
   const [promptModalType, setPromptModalType] = useState<PromptType | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<{ current: number; total: number; currentName: string } | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [syncDropdownOpen, setSyncDropdownOpen] = useState(false);
   const [interest, setInterest] = useState('');
@@ -237,25 +238,57 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
     setSyncDropdownOpen(false);
     onSyncStart?.();
 
+    // Calculate total items to sync
+    const rssCount = shouldSyncRss ? feeds.length : 0;
+    const externalCount = shouldSyncExternal ? externalSources.length : 0;
+    const totalItems = rssCount + externalCount;
+    let currentItem = 0;
+
     try {
-      // Sync RSS feeds if requested
-      const { entries: rssEntries, errors: rssErrors } = shouldSyncRss
-        ? await syncAllFeeds(feeds)
-        : { entries: [], errors: [] };
+      const rssEntries: RssEntry[] = [];
+      const rssErrors: Array<{ feedTitle: string; error: string }> = [];
+      const seenUrls = new Set<string>();
 
-      // Scrape external sources if requested
-      const externalResults = shouldSyncExternal
-        ? await Promise.all(externalSources.map(source => scrapeExternalSource(source)))
-        : [];
+      // Sync RSS feeds one by one with progress
+      if (shouldSyncRss) {
+        for (const feed of feeds) {
+          currentItem++;
+          setSyncProgress({ current: currentItem, total: totalItems, currentName: feed.title });
+          
+          const result = await fetchAndParseFeed(feed.id, feed.title, feed.url);
+          
+          if (result.error) {
+            rssErrors.push({ feedTitle: result.feedTitle, error: result.error });
+          } else {
+            // Deduplicate entries by URL
+            for (const entry of result.entries) {
+              if (!seenUrls.has(entry.link)) {
+                seenUrls.add(entry.link);
+                rssEntries.push(entry);
+              }
+            }
+          }
+        }
+      }
 
-      // Combine entries and errors
-      const externalEntries = externalResults.flatMap(r => r.entries);
-      const externalErrors = externalResults
-        .filter(r => r.error)
-        .map((r, i) => ({ 
-          feedTitle: externalSources[i]?.name || 'External', 
-          error: r.error! 
-        }));
+      // Scrape external sources one by one with progress
+      const externalEntries: RssEntry[] = [];
+      const externalErrors: Array<{ feedTitle: string; error: string }> = [];
+
+      if (shouldSyncExternal) {
+        for (const source of externalSources) {
+          currentItem++;
+          setSyncProgress({ current: currentItem, total: totalItems, currentName: source.name });
+          
+          const result = await scrapeExternalSource(source);
+          
+          if (result.error) {
+            externalErrors.push({ feedTitle: source.name, error: result.error });
+          } else {
+            externalEntries.push(...result.entries);
+          }
+        }
+      }
 
       // For partial syncs, preserve entries from the source type we didn't sync
       let allEntries: RssEntry[];
@@ -291,6 +324,7 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
       onSyncComplete?.([], [{ feedTitle: 'Sync', error: 'Failed to sync feeds' }]);
     } finally {
       setSyncing(false);
+      setSyncProgress(null);
     }
   };
 
@@ -456,6 +490,26 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
           </button>
         </div>
       </div>
+      {syncProgress && (
+        <div className={styles.syncProgressPane}>
+          <div className={styles.syncProgressHeader}>
+            <FontAwesomeIcon icon={faSync} spin className={styles.syncProgressIcon} />
+            <span>Syncing sources...</span>
+          </div>
+          <div className={styles.syncProgressDetails}>
+            <span className={styles.syncProgressName}>{syncProgress.currentName}</span>
+            <span className={styles.syncProgressCount}>
+              {syncProgress.current} of {syncProgress.total}
+            </span>
+          </div>
+          <div className={styles.syncProgressBarLarge}>
+            <div 
+              className={styles.syncProgressFillLarge} 
+              style={{ width: `${(syncProgress.current / syncProgress.total) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
       {promptModalType && (
         <PromptModal
           type={promptModalType}
