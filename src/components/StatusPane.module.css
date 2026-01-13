@@ -63,6 +63,11 @@
   gap: 0.5rem;
 }
 
+.syncWrapper {
+  position: relative;
+  display: flex;
+}
+
 .syncButton {
   display: flex;
   align-items: center;
@@ -70,13 +75,14 @@
   width: 36px;
   height: 36px;
   border: none;
-  border-radius: 8px;
+  border-radius: 8px 0 0 8px;
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.15s ease;
   font-size: 0.875rem;
   border: 1px solid var(--border);
+  border-right: none;
 }
 
 .syncButton:hover:not(:disabled) {
@@ -85,7 +91,7 @@
 }
 
 .syncButton:active:not(:disabled) {
-  transform: scale(0.96);
+  transform: scale(0.98);
 }
 
 .syncButton:disabled {
@@ -93,9 +99,87 @@
   cursor: not-allowed;
 }
 
+.syncDropdownToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 0 8px 8px 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 0.625rem;
+}
+
+.syncDropdownToggle:hover:not(:disabled) {
+  background: var(--bg-button-hover);
+  color: var(--text-primary);
+}
+
+.syncDropdownToggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .syncing {
   color: var(--accent);
   border-color: var(--accent);
+}
+
+.syncDropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 220px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.syncOption {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.1s ease;
+  text-align: left;
+}
+
+.syncOption:hover:not(:disabled) {
+  background: var(--bg-button-hover);
+}
+
+.syncOption:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.syncOption:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.syncOption svg {
+  width: 14px;
+  color: var(--text-muted);
+}
+
+.syncOptionCount {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .promptButton {

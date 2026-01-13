@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
+import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash, faChevronDown, faRss, faGlobe } from '@fortawesome/free-solid-svg-icons';
 import styles from './StatusPane.module.css';
 import PromptModal, { PromptType } from './PromptModal';
 import { syncAllFeeds, RssEntry } from '@/utils/rssParser';
@@ -10,9 +10,12 @@ import { TagFilters, TagType, ContentTagType, StatusTagType, CONTENT_TAG_LABELS,
 import { getInterest } from '@/utils/interestConfig';
 import { getExternalSources, ExternalSource } from '@/utils/externalSourcesConfig';
 import { SkoolPost } from '@/app/api/scrape/route';
+import { loadEntries } from '@/utils/entryStorage';
 
 const FEEDS_STORAGE_KEY = 'social-listening-feeds';
 const SYNC_TIME_STORAGE_KEY = 'social-listening-last-sync';
+
+type SyncType = 'all' | 'rss' | 'external';
 
 interface Feed {
   id: string;
@@ -38,8 +41,10 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
   const [promptModalType, setPromptModalType] = useState<PromptType | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [syncDropdownOpen, setSyncDropdownOpen] = useState(false);
   const [interest, setInterest] = useState('');
   const filterRef = useRef<HTMLDivElement>(null);
+  const syncRef = useRef<HTMLDivElement>(null);
 
   // Extract unique feed titles from entries
   const uniqueFeedTitles = useMemo(() => {
@@ -108,11 +113,14 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
     setInterest(getInterest());
   }, []);
 
-  // Close filter dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
         setFilterOpen(false);
+      }
+      if (syncRef.current && !syncRef.current.contains(event.target as Node)) {
+        setSyncDropdownOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -217,24 +225,28 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
     }
   };
 
-  const handleSync = async () => {
-    if (feeds.length === 0 && externalSources.length === 0) {
+  const handleSync = async (syncType: SyncType = 'all') => {
+    const shouldSyncRss = (syncType === 'all' || syncType === 'rss') && feeds.length > 0;
+    const shouldSyncExternal = (syncType === 'all' || syncType === 'external') && externalSources.length > 0;
+
+    if (!shouldSyncRss && !shouldSyncExternal) {
       return;
     }
 
     setSyncing(true);
+    setSyncDropdownOpen(false);
     onSyncStart?.();
 
     try {
-      // Sync RSS feeds
-      const { entries: rssEntries, errors: rssErrors } = feeds.length > 0 
+      // Sync RSS feeds if requested
+      const { entries: rssEntries, errors: rssErrors } = shouldSyncRss
         ? await syncAllFeeds(feeds)
         : { entries: [], errors: [] };
 
-      // Scrape Skool sources in parallel
-      const externalResults = await Promise.all(
-        externalSources.map(source => scrapeExternalSource(source))
-      );
+      // Scrape external sources if requested
+      const externalResults = shouldSyncExternal
+        ? await Promise.all(externalSources.map(source => scrapeExternalSource(source)))
+        : [];
 
       // Combine entries and errors
       const externalEntries = externalResults.flatMap(r => r.entries);
@@ -245,7 +257,26 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
           error: r.error! 
         }));
 
-      const allEntries = [...rssEntries, ...externalEntries];
+      // For partial syncs, preserve entries from the source type we didn't sync
+      let allEntries: RssEntry[];
+      if (syncType === 'all') {
+        // Full sync: replace everything
+        allEntries = [...rssEntries, ...externalEntries];
+      } else {
+        // Partial sync: merge with existing entries from the other source type
+        const existingEntries = loadEntries();
+        
+        if (syncType === 'rss') {
+          // Keep existing external entries (feedId starts with 'skool-')
+          const existingExternalEntries = existingEntries.filter(e => e.feedId?.startsWith('skool-'));
+          allEntries = [...rssEntries, ...existingExternalEntries];
+        } else {
+          // Keep existing RSS entries (feedId does NOT start with 'skool-')
+          const existingRssEntries = existingEntries.filter(e => !e.feedId?.startsWith('skool-'));
+          allEntries = [...existingRssEntries, ...externalEntries];
+        }
+      }
+
       const allErrors = [...rssErrors, ...externalErrors];
 
       // Update last sync time
@@ -290,14 +321,55 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
           </div>
         </div>
         <div className={styles.actions}>
-          <button
-            className={`${styles.syncButton} ${syncing ? styles.syncing : ''}`}
-            onClick={handleSync}
-            title="Sync"
-            disabled={syncing || (feeds.length === 0 && externalSources.length === 0)}
-          >
-            <FontAwesomeIcon icon={faSync} spin={syncing} />
-          </button>
+          <div className={styles.syncWrapper} ref={syncRef}>
+            <button
+              className={`${styles.syncButton} ${syncing ? styles.syncing : ''}`}
+              onClick={() => handleSync('all')}
+              title="Sync All Sources"
+              disabled={syncing || (feeds.length === 0 && externalSources.length === 0)}
+            >
+              <FontAwesomeIcon icon={faSync} spin={syncing} />
+            </button>
+            <button
+              className={`${styles.syncDropdownToggle} ${syncing ? styles.syncing : ''}`}
+              onClick={() => setSyncDropdownOpen(!syncDropdownOpen)}
+              disabled={syncing || (feeds.length === 0 && externalSources.length === 0)}
+              title="Sync Options"
+            >
+              <FontAwesomeIcon icon={faChevronDown} />
+            </button>
+            {syncDropdownOpen && (
+              <div className={styles.syncDropdown}>
+                <button
+                  className={styles.syncOption}
+                  onClick={() => handleSync('all')}
+                  disabled={feeds.length === 0 && externalSources.length === 0}
+                >
+                  <FontAwesomeIcon icon={faSync} />
+                  <span>Sync All</span>
+                  <span className={styles.syncOptionCount}>({feeds.length + externalSources.length})</span>
+                </button>
+                <button
+                  className={styles.syncOption}
+                  onClick={() => handleSync('rss')}
+                  disabled={feeds.length === 0}
+                >
+                  <FontAwesomeIcon icon={faRss} />
+                  <span>Sync RSS Feeds Only</span>
+                  <span className={styles.syncOptionCount}>({feeds.length})</span>
+                </button>
+                <button
+                  className={styles.syncOption}
+                  onClick={() => handleSync('external')}
+                  disabled={externalSources.length === 0}
+                >
+                  <FontAwesomeIcon icon={faGlobe} />
+                  <span>Sync External Sites Only</span>
+                  <span className={styles.syncOptionCount}>({externalSources.length})</span>
+                </button>
+              </div>
+            )}
+          </div>
           <div className={styles.filterWrapper} ref={filterRef}>
             <button
               className={`${styles.filterButton} ${activeFilterCount > 0 ? styles.filterActive : ''}`}
