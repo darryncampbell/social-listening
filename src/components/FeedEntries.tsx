@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck, faBan, faUndo, faExternalLinkAlt, faChevronDown, faChevronUp, faSpinner, faWandMagicSparkles, faRedo, faLink, faComment, faCodeBranch, faTrash, faBullhorn, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faBan, faUndo, faExternalLinkAlt, faChevronDown, faChevronUp, faSpinner, faWandMagicSparkles, faRedo, faLink, faComment, faCodeBranch, faTrash, faBullhorn, faExclamationTriangle, faCrown } from '@fortawesome/free-solid-svg-icons';
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
 import { RssEntry } from '@/utils/rssParser';
 import {
@@ -14,7 +14,7 @@ import {
 } from '@/utils/entryState';
 import { getAiResponse, saveAiResponse } from '@/utils/aiResponseStorage';
 import { getPrompt, getCommentPrompt } from '@/utils/promptConfig';
-import { getInterest } from '@/utils/interestConfig';
+import { getInterest, getRecognizedUsers } from '@/utils/interestConfig';
 import {
   getCachedAuthor,
   setCachedAuthor,
@@ -381,10 +381,13 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
   const [highlightedCrossPost, setHighlightedCrossPost] = useState<string | null>(null);
   // Store Reddit authors keyed by URL
   const [redditAuthors, setRedditAuthors] = useState<Map<string, string>>(new Map());
+  // Store recognized users list
+  const [recognizedUsers, setRecognizedUsers] = useState<string[]>([]);
 
   // Load interest configuration on mount
   useEffect(() => {
     setInterest(getInterest());
+    setRecognizedUsers(getRecognizedUsers());
   }, []);
 
   // Fetch Reddit authors asynchronously after entries are loaded
@@ -580,6 +583,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
         highlightedCrossPost={highlightedCrossPost}
         onCrossPostClick={toggleCrossPostHighlight}
         redditAuthors={redditAuthors}
+        recognizedUsers={recognizedUsers}
       />
 
       <EntryTable
@@ -593,6 +597,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
         highlightedCrossPost={highlightedCrossPost}
         onCrossPostClick={toggleCrossPostHighlight}
         redditAuthors={redditAuthors}
+        recognizedUsers={recognizedUsers}
       />
 
       <EntryTable
@@ -606,6 +611,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
         highlightedCrossPost={highlightedCrossPost}
         onCrossPostClick={toggleCrossPostHighlight}
         redditAuthors={redditAuthors}
+        recognizedUsers={recognizedUsers}
       />
     </div>
   );
@@ -622,9 +628,10 @@ interface EntryTableProps {
   highlightedCrossPost: string | null;
   onCrossPostClick: (description: string) => void;
   redditAuthors: Map<string, string>;
+  recognizedUsers: string[];
 }
 
-function EntryTable({ id, title, entries, status, onAction, crossPostDescriptions, interest, highlightedCrossPost, onCrossPostClick, redditAuthors }: EntryTableProps) {
+function EntryTable({ id, title, entries, status, onAction, crossPostDescriptions, interest, highlightedCrossPost, onCrossPostClick, redditAuthors, recognizedUsers }: EntryTableProps) {
   if (entries.length === 0) {
     return null;
   }
@@ -648,6 +655,7 @@ function EntryTable({ id, title, entries, status, onAction, crossPostDescription
             highlightedCrossPost={highlightedCrossPost}
             onCrossPostClick={onCrossPostClick}
             redditAuthor={entry.link ? redditAuthors.get(entry.link) : undefined}
+            recognizedUsers={recognizedUsers}
           />
         ))}
       </div>
@@ -666,9 +674,20 @@ interface EntryRowProps {
   highlightedCrossPost: string | null;
   onCrossPostClick: (description: string) => void;
   redditAuthor?: string;
+  recognizedUsers: string[];
 }
 
-function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, isIndented, isDummyParent, highlightedCrossPost, onCrossPostClick, redditAuthor }: EntryRowProps) {
+// Check if a username matches any recognized user (tolerant of u/ prefix)
+function isUserRecognized(username: string, recognizedUsers: string[]): boolean {
+  if (!username) return false;
+  const normalizedUsername = username.toLowerCase().replace(/^u\//, '');
+  return recognizedUsers.some(recognized => {
+    const normalizedRecognized = recognized.toLowerCase().replace(/^u\//, '');
+    return normalizedUsername === normalizedRecognized;
+  });
+}
+
+function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, isIndented, isDummyParent, highlightedCrossPost, onCrossPostClick, redditAuthor, recognizedUsers }: EntryRowProps) {
   const [showRawDetails, setShowRawDetails] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | undefined>(undefined);
   const [generating, setGenerating] = useState(false);
@@ -951,9 +970,15 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, is
                   href={`https://www.reddit.com/user/${redditAuthor}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={styles.entryAuthorLink}
+                  className={`${styles.entryAuthorLink} ${isUserRecognized(redditAuthor, recognizedUsers) ? styles.entryAuthorRecognized : ''}`}
                 >
+                  {isUserRecognized(redditAuthor, recognizedUsers) && (
+                    <FontAwesomeIcon icon={faCrown} className={styles.crownIconLeft} />
+                  )}
                   u/{redditAuthor}
+                  {isUserRecognized(redditAuthor, recognizedUsers) && (
+                    <FontAwesomeIcon icon={faCrown} className={styles.crownIconRight} />
+                  )}
                 </a>
               </span>
             )}

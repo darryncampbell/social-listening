@@ -92,3 +92,89 @@
   color: var(--accent);
   background: var(--accent-alpha);
 }
+
+/* Subsection styles */
+.subsection {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.subsectionTitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0 0 0.375rem 0;
+}
+
+.subsectionDescription {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin: 0 0 1rem 0;
+  line-height: 1.5;
+}
+
+.addButton {
+  background: var(--accent);
+  color: white;
+}
+
+.addButton:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.addButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* User list */
+.userList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.userTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.5rem 0.375rem 0.75rem;
+  background: var(--accent-alpha);
+  border: 1px solid var(--accent);
+  border-radius: 20px;
+  font-size: 0.8125rem;
+  color: var(--accent);
+}
+
+.userName {
+  font-weight: 500;
+}
+
+.removeUserBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.removeUserBtn:hover {
+  background: var(--accent);
+  color: white;
+}
+
+.emptyList {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  font-style: italic;
+  margin: 0.5rem 0 0 0;
+}
