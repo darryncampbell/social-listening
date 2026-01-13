@@ -371,10 +371,17 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
     ignored: [],
   });
   const [interest, setInterest] = useState('Darryn Campbell');
+  // Track which cross-post description is currently highlighted (null = none)
+  const [highlightedCrossPost, setHighlightedCrossPost] = useState<string | null>(null);
 
   // Load interest configuration on mount
   useEffect(() => {
     setInterest(getInterest());
+  }, []);
+
+  // Toggle cross-post highlight
+  const toggleCrossPostHighlight = useCallback((description: string) => {
+    setHighlightedCrossPost(prev => prev === description ? null : description);
   }, []);
 
   // Compute cross-post descriptions across all entries
@@ -492,6 +499,8 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
         onAction={handleAction}
         crossPostDescriptions={crossPostDescriptions}
         interest={interest}
+        highlightedCrossPost={highlightedCrossPost}
+        onCrossPostClick={toggleCrossPostHighlight}
       />
 
       <EntryTable
@@ -502,6 +511,8 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
         onAction={handleAction}
         crossPostDescriptions={crossPostDescriptions}
         interest={interest}
+        highlightedCrossPost={highlightedCrossPost}
+        onCrossPostClick={toggleCrossPostHighlight}
       />
 
       <EntryTable
@@ -512,6 +523,8 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
         onAction={handleAction}
         crossPostDescriptions={crossPostDescriptions}
         interest={interest}
+        highlightedCrossPost={highlightedCrossPost}
+        onCrossPostClick={toggleCrossPostHighlight}
       />
     </div>
   );
@@ -525,9 +538,11 @@ interface EntryTableProps {
   onAction: (entryId: string, action: 'process' | 'ignore' | 'restore') => void;
   crossPostDescriptions: Set<string>;
   interest: string;
+  highlightedCrossPost: string | null;
+  onCrossPostClick: (description: string) => void;
 }
 
-function EntryTable({ id, title, entries, status, onAction, crossPostDescriptions, interest }: EntryTableProps) {
+function EntryTable({ id, title, entries, status, onAction, crossPostDescriptions, interest, highlightedCrossPost, onCrossPostClick }: EntryTableProps) {
   if (entries.length === 0) {
     return null;
   }
@@ -548,6 +563,8 @@ function EntryTable({ id, title, entries, status, onAction, crossPostDescription
             interest={interest}
             isIndented={entry.isCommentThread}
             isDummyParent={entry.isDummyParent}
+            highlightedCrossPost={highlightedCrossPost}
+            onCrossPostClick={onCrossPostClick}
           />
         ))}
       </div>
@@ -563,9 +580,11 @@ interface EntryRowProps {
   interest: string;
   isIndented?: boolean;
   isDummyParent?: boolean;
+  highlightedCrossPost: string | null;
+  onCrossPostClick: (description: string) => void;
 }
 
-function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, isIndented, isDummyParent }: EntryRowProps) {
+function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, isIndented, isDummyParent, highlightedCrossPost, onCrossPostClick }: EntryRowProps) {
   const [showRawDetails, setShowRawDetails] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | undefined>(undefined);
   const [generating, setGenerating] = useState(false);
@@ -732,6 +751,11 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, is
   const entryClassNames = [styles.entry];
   if (isIndented) entryClassNames.push(styles.entryIndented);
   if (isDummyParent) entryClassNames.push(styles.entryDummyParent);
+  
+  // Check if this entry should be highlighted as a cross-post
+  const entryDescription = (displayDescription || '').trim().toLowerCase();
+  const isHighlightedCrossPost = highlightedCrossPost !== null && entryDescription === highlightedCrossPost;
+  if (isHighlightedCrossPost) entryClassNames.push(styles.entryCrossPostHighlight);
 
   return (
     <div className={entryClassNames.join(' ')}>
@@ -764,10 +788,14 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, is
                 </span>
               )}
               {isCrossPost && (
-                <span className={`${styles.label} ${styles.labelCrossPost}`}>
+                <button 
+                  className={`${styles.label} ${styles.labelCrossPost}`}
+                  onClick={() => onCrossPostClick((displayDescription || '').trim().toLowerCase())}
+                  title="Click to highlight all cross-posts with the same content"
+                >
                   <FontAwesomeIcon icon={faCodeBranch} />
                   <span>Cross Post</span>
-                </span>
+                </button>
               )}
               {isDeleted && (
                 <span className={`${styles.label} ${styles.labelDeleted}`}>

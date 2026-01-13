@@ -93,6 +93,11 @@
   opacity: 0.85;
 }
 
+.entryCrossPostHighlight {
+  border: 2px solid #8b5cf6;
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
+}
+
 .entryHeader {
   display: flex;
   align-items: center;
@@ -152,6 +157,12 @@
   background: rgba(139, 92, 246, 0.15);
   color: #8b5cf6;
   border: 1px solid rgba(139, 92, 246, 0.3);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.labelCrossPost:hover {
+  background: rgba(139, 92, 246, 0.25);
 }
 
 .labelDeleted {
