@@ -15,6 +15,12 @@ import {
 import { getAiResponse, saveAiResponse } from '@/utils/aiResponseStorage';
 import { getPrompt, getCommentPrompt } from '@/utils/promptConfig';
 import { getInterest } from '@/utils/interestConfig';
+import {
+  getCachedAuthor,
+  setCachedAuthor,
+  isRedditUrl,
+  getUncachedUrls,
+} from '@/utils/redditAuthorCache';
 import styles from './FeedEntries.module.css';
 
 /**
@@ -373,11 +379,83 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
   const [interest, setInterest] = useState('Darryn Campbell');
   // Track which cross-post description is currently highlighted (null = none)
   const [highlightedCrossPost, setHighlightedCrossPost] = useState<string | null>(null);
+  // Store Reddit authors keyed by URL
+  const [redditAuthors, setRedditAuthors] = useState<Map<string, string>>(new Map());
 
   // Load interest configuration on mount
   useEffect(() => {
     setInterest(getInterest());
   }, []);
+
+  // Fetch Reddit authors asynchronously after entries are loaded
+  useEffect(() => {
+    if (loading || entries.length === 0) return;
+
+    // Find all Reddit URLs (posts and comments) that need author lookup
+    const redditPostUrls = entries
+      .filter(entry => entry.link && isRedditUrl(entry.link))
+      .map(entry => entry.link!);
+
+    if (redditPostUrls.length === 0) return;
+
+    // Load cached authors first
+    const cachedAuthors = new Map<string, string>();
+    for (const url of redditPostUrls) {
+      const cached = getCachedAuthor(url);
+      if (cached) {
+        cachedAuthors.set(url, cached);
+      }
+    }
+    
+    // Update state with cached authors
+    if (cachedAuthors.size > 0) {
+      setRedditAuthors(prev => new Map([...prev, ...cachedAuthors]));
+    }
+
+    // Find URLs that need to be fetched
+    const uncachedUrls = getUncachedUrls(redditPostUrls);
+    if (uncachedUrls.length === 0) return;
+
+    // Fetch uncached authors with rate limiting (one at a time with delay)
+    let cancelled = false;
+    
+    const fetchAuthors = async () => {
+      for (const url of uncachedUrls) {
+        if (cancelled) break;
+        
+        try {
+          const response = await fetch(`/api/reddit-author?url=${encodeURIComponent(url)}`);
+          
+          if (response.status === 429) {
+            // Rate limited - stop fetching for now
+            console.log('Reddit API rate limited, pausing author fetches');
+            break;
+          }
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.author) {
+              // Cache the result
+              setCachedAuthor(url, data.author);
+              // Update state
+              setRedditAuthors(prev => new Map([...prev, [url, data.author]]));
+            }
+          }
+          
+          // Small delay between requests to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error) {
+          console.error('Error fetching Reddit author for', url, error);
+        }
+      }
+    };
+
+    fetchAuthors();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [entries, loading]);
 
   // Toggle cross-post highlight
   const toggleCrossPostHighlight = useCallback((description: string) => {
@@ -501,6 +579,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
         interest={interest}
         highlightedCrossPost={highlightedCrossPost}
         onCrossPostClick={toggleCrossPostHighlight}
+        redditAuthors={redditAuthors}
       />
 
       <EntryTable
@@ -513,6 +592,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
         interest={interest}
         highlightedCrossPost={highlightedCrossPost}
         onCrossPostClick={toggleCrossPostHighlight}
+        redditAuthors={redditAuthors}
       />
 
       <EntryTable
@@ -525,6 +605,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
         interest={interest}
         highlightedCrossPost={highlightedCrossPost}
         onCrossPostClick={toggleCrossPostHighlight}
+        redditAuthors={redditAuthors}
       />
     </div>
   );
@@ -540,9 +621,10 @@ interface EntryTableProps {
   interest: string;
   highlightedCrossPost: string | null;
   onCrossPostClick: (description: string) => void;
+  redditAuthors: Map<string, string>;
 }
 
-function EntryTable({ id, title, entries, status, onAction, crossPostDescriptions, interest, highlightedCrossPost, onCrossPostClick }: EntryTableProps) {
+function EntryTable({ id, title, entries, status, onAction, crossPostDescriptions, interest, highlightedCrossPost, onCrossPostClick, redditAuthors }: EntryTableProps) {
   if (entries.length === 0) {
     return null;
   }
@@ -565,6 +647,7 @@ function EntryTable({ id, title, entries, status, onAction, crossPostDescription
             isDummyParent={entry.isDummyParent}
             highlightedCrossPost={highlightedCrossPost}
             onCrossPostClick={onCrossPostClick}
+            redditAuthor={entry.link ? redditAuthors.get(entry.link) : undefined}
           />
         ))}
       </div>
@@ -582,9 +665,10 @@ interface EntryRowProps {
   isDummyParent?: boolean;
   highlightedCrossPost: string | null;
   onCrossPostClick: (description: string) => void;
+  redditAuthor?: string;
 }
 
-function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, isIndented, isDummyParent, highlightedCrossPost, onCrossPostClick }: EntryRowProps) {
+function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, isIndented, isDummyParent, highlightedCrossPost, onCrossPostClick, redditAuthor }: EntryRowProps) {
   const [showRawDetails, setShowRawDetails] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | undefined>(undefined);
   const [generating, setGenerating] = useState(false);
@@ -859,6 +943,18 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, is
             {typeof entry.rawDetails?.lastCommentTime === 'string' && entry.rawDetails.lastCommentTime && (
               <span className={styles.entryLastComment}>
                 Last activity: {formatDate(entry.rawDetails.lastCommentTime)}
+              </span>
+            )}
+            {redditAuthor && (
+              <span className={styles.entryAuthor}>
+                by <a 
+                  href={`https://www.reddit.com/user/${redditAuthor}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.entryAuthorLink}
+                >
+                  u/{redditAuthor}
+                </a>
               </span>
             )}
             {entry.og?.ogSiteName && (

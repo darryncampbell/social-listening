@@ -321,6 +321,23 @@
   border-left: 1px solid var(--border);
 }
 
+.entryAuthor {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--border);
+}
+
+.entryAuthorLink {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.entryAuthorLink:hover {
+  text-decoration: underline;
+}
+
 .entrySiteName {
   font-size: 0.75rem;
   color: var(--text-muted);
