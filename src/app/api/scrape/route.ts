@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit, getClientIp, RATE_LIMITS } from '@/utils/rateLimit';
 
-// Vercel function configuration - 5 seconds for free tier compatibility
-export const maxDuration = 5;
+// Vercel function configuration - 10 seconds max for free tier
+export const maxDuration = 10;
 
 // Check if we're in a serverless environment (Vercel, AWS Lambda, etc.)
 const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
@@ -15,9 +15,19 @@ async function getBrowser() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const chromium = await import('@sparticuz/chromium') as any;
     
+    // Optimize for faster cold starts
+    chromium.default.setHeadlessMode = true;
+    chromium.default.setGraphicsMode = false;
+    
     return await puppeteerCore.default.launch({
-      args: chromium.default.args,
-      defaultViewport: chromium.default.defaultViewport,
+      args: [
+        ...chromium.default.args,
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+        '--disable-software-rasterizer',
+        '--single-process',
+      ],
+      defaultViewport: { width: 1280, height: 720 },
       executablePath: await chromium.default.executablePath(),
       headless: chromium.default.headless,
     });
@@ -117,19 +127,19 @@ export async function POST(request: NextRequest) {
 
     // Navigate to the page (use 'domcontentloaded' for faster loading within timeout)
     console.log('[Scrape] Navigating to page...');
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 4000 });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 5000 });
     console.log('[Scrape] Page loaded (domcontentloaded)');
 
     // Wait briefly for content to load - Skool uses styled-components with PostItem pattern
     console.log('[Scrape] Waiting for content selectors...');
-    const selectorFound = await page.waitForSelector('[class*="PostItemWrapper"], [class*="PostItemCard"]', { timeout: 1500 })
+    const selectorFound = await page.waitForSelector('[class*="PostItemWrapper"], [class*="PostItemCard"]', { timeout: 1000 })
       .then(() => true)
       .catch(() => false);
     console.log('[Scrape] Selector found:', selectorFound);
 
-    // Scroll to load more posts (max 2 seconds or 50 posts - keeping time for browser ops)
+    // Scroll to load more posts (max 1 second or 50 posts - keeping time for browser ops)
     const startTime = Date.now();
-    const maxScrollTime = 2000;
+    const maxScrollTime = 1000;
     const maxPosts = 50;
     
     let previousPostCount = 0;
