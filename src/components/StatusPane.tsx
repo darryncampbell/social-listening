@@ -185,7 +185,8 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
       rawXml: '',
       link: post.link,
       title: post.title || `Post by ${post.author}`,
-      publishedDate: post.date || new Date().toISOString(),
+      // Use post.date if available; empty string will sort to end (getEntryDate returns 0)
+      publishedDate: post.date || '',
       description: fullDescription,
       og: post.authorAvatar ? {
         ogImage: post.authorAvatar,

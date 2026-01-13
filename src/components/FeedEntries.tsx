@@ -224,17 +224,16 @@ interface EntryWithThread extends RssEntry {
 }
 
 function groupCommentsUnderArticles(entries: RssEntry[], listName: string): EntryWithThread[] {
-  // Build a map of article IDs to their entries
+  // Build maps for Reddit article/comment grouping
   const articleIdToEntry = new Map<string, RssEntry>();
   const commentsByArticleId = new Map<string, RssEntry[]>();
-  const nonRedditEntries: RssEntry[] = [];
   
+  // First pass: categorize entries
   for (const entry of entries) {
     const articleId = getRedditArticleId(entry.link);
     
     if (!articleId) {
-      // Not a Reddit URL
-      nonRedditEntries.push(entry);
+      // Not a Reddit URL - will be handled in sorted order below
       continue;
     }
     
@@ -250,59 +249,144 @@ function groupCommentsUnderArticles(entries: RssEntry[], listName: string): Entr
     }
   }
   
-  // Build result: articles with their comments grouped below them
-  const result: EntryWithThread[] = [];
-  const processedArticleIds = new Set<string>();
-  
-  // First, add non-Reddit entries
-  for (const entry of nonRedditEntries) {
-    result.push(entry);
+  // Sort comments within each group by date descending
+  for (const comments of commentsByArticleId.values()) {
+    comments.sort((a, b) => getEntryDate(b) - getEntryDate(a));
   }
   
-  // Process each article and its comments
-  for (const [articleId, article] of articleIdToEntry) {
-    result.push(article);
+  // Build result: preserve original sorted order, but insert comments after their parent articles
+  const result: EntryWithThread[] = [];
+  const processedArticleIds = new Set<string>();
+  const processedCommentIds = new Set<string>();
+  
+  // Process entries in their original sorted order
+  for (const entry of entries) {
+    const articleId = getRedditArticleId(entry.link);
+    
+    if (!articleId) {
+      // Non-Reddit entry - add in sorted position
+      result.push(entry);
+      continue;
+    }
+    
+    if (isRedditComment(entry.link)) {
+      // Skip comments here - they'll be added after their parent article
+      continue;
+    }
+    
+    // This is a Reddit article - add it and its comments
+    result.push(entry);
     processedArticleIds.add(articleId);
     
-    // Add any comments for this article
+    // Add any comments for this article right after it
     const comments = commentsByArticleId.get(articleId);
     if (comments) {
-      // Sort comments by date descending
-      comments.sort((a, b) => getEntryDate(b) - getEntryDate(a));
       for (const comment of comments) {
         result.push({ ...comment, isCommentThread: true });
+        processedCommentIds.add(comment.id);
       }
     }
   }
   
   // Handle orphan comments (parent article not in list)
-  for (const [articleId, comments] of commentsByArticleId) {
-    if (processedArticleIds.has(articleId)) continue;
+  // Group them by article ID and insert at the position of the first comment
+  const orphanGroups = new Map<string, { position: number; comments: RssEntry[] }>();
+  
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    if (!isRedditComment(entry.link)) continue;
     
-    // Sort comments by date descending
-    comments.sort((a, b) => getEntryDate(b) - getEntryDate(a));
+    const articleId = getRedditArticleId(entry.link);
+    if (!articleId || processedArticleIds.has(articleId)) continue;
     
-    // Create a dummy parent entry
-    const firstComment = comments[0];
-    const articleUrl = getRedditArticleUrl(firstComment.link);
-    const dummyParent: EntryWithThread = {
-      id: `dummy-article-${articleId}`,
-      title: `Reddit Thread (${comments.length} comment${comments.length > 1 ? 's' : ''})`,
-      description: `Parent article not in '${listName}' list - click to view the original thread`,
-      link: articleUrl || firstComment.link.replace(/\/c\/.*$/, '/'),
-      publishedDate: firstComment.publishedDate,
-      feedTitle: firstComment.feedTitle,
-      feedId: firstComment.feedId,
-      rawXml: '', // Dummy entries don't have raw XML
-      isDummyParent: true,
-    };
-    
-    result.push(dummyParent);
-    
-    // Add comments under the dummy parent
-    for (const comment of comments) {
-      result.push({ ...comment, isCommentThread: true });
+    if (!orphanGroups.has(articleId)) {
+      orphanGroups.set(articleId, { position: i, comments: [] });
     }
+    orphanGroups.get(articleId)!.comments.push(entry);
+  }
+  
+  // Insert orphan groups at their positions (need to rebuild result to insert at correct positions)
+  if (orphanGroups.size > 0) {
+    const finalResult: EntryWithThread[] = [];
+    const orphanInsertPositions = new Map<number, { articleId: string; comments: RssEntry[] }[]>();
+    
+    // Track which original positions need orphan insertions
+    for (const [articleId, { position, comments }] of orphanGroups) {
+      if (!orphanInsertPositions.has(position)) {
+        orphanInsertPositions.set(position, []);
+      }
+      orphanInsertPositions.get(position)!.push({ articleId, comments });
+    }
+    
+    // Rebuild result, inserting orphan groups at appropriate positions
+    let originalIndex = 0;
+    for (const entry of result) {
+      // Check if we need to insert orphan groups before this entry
+      // Find the original position of this entry in the input
+      while (originalIndex < entries.length) {
+        const insertions = orphanInsertPositions.get(originalIndex);
+        if (insertions) {
+          for (const { articleId, comments } of insertions) {
+            // Create dummy parent
+            const firstComment = comments[0];
+            const articleUrl = getRedditArticleUrl(firstComment.link);
+            const dummyParent: EntryWithThread = {
+              id: `dummy-article-${articleId}`,
+              title: `Reddit Thread (${comments.length} comment${comments.length > 1 ? 's' : ''})`,
+              description: `Parent article not in '${listName}' list - click to view the original thread`,
+              link: articleUrl || firstComment.link.replace(/\/c\/.*$/, '/'),
+              publishedDate: firstComment.publishedDate,
+              feedTitle: firstComment.feedTitle,
+              feedId: firstComment.feedId,
+              rawXml: '',
+              isDummyParent: true,
+            };
+            
+            finalResult.push(dummyParent);
+            for (const comment of comments) {
+              finalResult.push({ ...comment, isCommentThread: true });
+            }
+          }
+          orphanInsertPositions.delete(originalIndex);
+        }
+        
+        // Move to next original index if this isn't a comment we skipped
+        const origEntry = entries[originalIndex];
+        if (origEntry && origEntry.id === entry.id) {
+          originalIndex++;
+          break;
+        }
+        originalIndex++;
+      }
+      
+      finalResult.push(entry);
+    }
+    
+    // Add any remaining orphan groups at the end
+    for (const [, insertions] of orphanInsertPositions) {
+      for (const { articleId, comments } of insertions) {
+        const firstComment = comments[0];
+        const articleUrl = getRedditArticleUrl(firstComment.link);
+        const dummyParent: EntryWithThread = {
+          id: `dummy-article-${articleId}`,
+          title: `Reddit Thread (${comments.length} comment${comments.length > 1 ? 's' : ''})`,
+          description: `Parent article not in '${listName}' list - click to view the original thread`,
+          link: articleUrl || firstComment.link.replace(/\/c\/.*$/, '/'),
+          publishedDate: firstComment.publishedDate,
+          feedTitle: firstComment.feedTitle,
+          feedId: firstComment.feedId,
+          rawXml: '',
+          isDummyParent: true,
+        };
+        
+        finalResult.push(dummyParent);
+        for (const comment of comments) {
+          finalResult.push({ ...comment, isCommentThread: true });
+        }
+      }
+    }
+    
+    return finalResult;
   }
   
   return result;

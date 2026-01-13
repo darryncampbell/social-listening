@@ -265,8 +265,8 @@ export async function POST(request: NextRequest) {
           }
         }
         
-        // Fallback: return current time if we can't parse
-        return now.toISOString();
+        // Fallback: return empty string if we can't parse (handled by caller)
+        return '';
       }
       
       // Skool uses styled-components with PostItemWrapper (not PostItemCardWrapper) for each post

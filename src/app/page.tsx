@@ -27,15 +27,32 @@ export default function Home() {
     if (storedFilters) {
       try {
         const parsed = JSON.parse(storedFilters);
-        // Merge with defaults, ensuring feeds object is properly merged
-        setTagFilters({
-          ...DEFAULT_TAG_FILTERS,
-          ...parsed,
-          feeds: {
-            ...DEFAULT_TAG_FILTERS.feeds,
-            ...(parsed.feeds || {}),
-          },
-        });
+        
+        // Sanitize filter values - convert any old values to 'shown'
+        // (handles migration from old 3-state model: 'include'/'exclude'/'off')
+        const sanitizeValue = (val: unknown): 'shown' | 'hidden' => 
+          val === 'hidden' ? 'hidden' : 'shown';
+        
+        const sanitizedFilters: TagFilters = {
+          comment: sanitizeValue(parsed.comment),
+          crossPost: sanitizeValue(parsed.crossPost),
+          deleted: sanitizeValue(parsed.deleted),
+          mentionsInterest: sanitizeValue(parsed.mentionsInterest),
+          github: sanitizeValue(parsed.github),
+          statusToProcess: sanitizeValue(parsed.statusToProcess),
+          statusDone: sanitizeValue(parsed.statusDone),
+          statusIgnored: sanitizeValue(parsed.statusIgnored),
+          feeds: {},
+        };
+        
+        // Sanitize feed filters
+        if (parsed.feeds && typeof parsed.feeds === 'object') {
+          for (const [key, val] of Object.entries(parsed.feeds)) {
+            sanitizedFilters.feeds[key] = sanitizeValue(val);
+          }
+        }
+        
+        setTagFilters(sanitizedFilters);
       } catch {
         // Use defaults if parsing fails
       }
