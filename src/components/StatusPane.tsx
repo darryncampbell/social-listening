@@ -8,7 +8,7 @@ import PromptModal, { PromptType } from './PromptModal';
 import { syncAllFeeds, RssEntry } from '@/utils/rssParser';
 import { TagFilters, TagType, ContentTagType, StatusTagType, CONTENT_TAG_LABELS, STATUS_TAG_LABELS, toggleFilterState, getFeedFilterState } from '@/utils/tagFilter';
 import { getInterest } from '@/utils/interestConfig';
-import { getSkoolSources, SkoolSource } from '@/utils/skoolConfig';
+import { getExternalSources, ExternalSource } from '@/utils/externalSourcesConfig';
 import { SkoolPost } from '@/app/api/scrape/route';
 
 const FEEDS_STORAGE_KEY = 'social-listening-feeds';
@@ -31,7 +31,7 @@ interface StatusPaneProps {
 export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, onTagFiltersChange, entries }: StatusPaneProps) {
   const [feedCount, setFeedCount] = useState<number>(0);
   const [feeds, setFeeds] = useState<Feed[]>([]);
-  const [skoolSources, setSkoolSources] = useState<SkoolSource[]>([]);
+  const [externalSources, setExternalSources] = useState<ExternalSource[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [lastSyncDate, setLastSyncDate] = useState<Date | null>(null);
   const [isSyncStale, setIsSyncStale] = useState(false);
@@ -80,9 +80,9 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
       }
     }
 
-    // Load Skool sources
-    const sources = getSkoolSources();
-    setSkoolSources(sources);
+    // Load external sources
+    const sources = getExternalSources();
+    setExternalSources(sources);
 
     // Load last sync time
     const storedSyncTime = localStorage.getItem(SYNC_TIME_STORAGE_KEY);
@@ -197,7 +197,7 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
     };
   };
 
-  const scrapeSkoolSource = async (source: SkoolSource): Promise<{ entries: RssEntry[]; error?: string }> => {
+  const scrapeExternalSource = async (source: ExternalSource): Promise<{ entries: RssEntry[]; error?: string }> => {
     try {
       const response = await fetch('/api/scrape', {
         method: 'POST',
@@ -220,7 +220,7 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
   };
 
   const handleSync = async () => {
-    if (feeds.length === 0 && skoolSources.length === 0) {
+    if (feeds.length === 0 && externalSources.length === 0) {
       return;
     }
 
@@ -234,21 +234,21 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
         : { entries: [], errors: [] };
 
       // Scrape Skool sources in parallel
-      const skoolResults = await Promise.all(
-        skoolSources.map(source => scrapeSkoolSource(source))
+      const externalResults = await Promise.all(
+        externalSources.map(source => scrapeExternalSource(source))
       );
 
       // Combine entries and errors
-      const skoolEntries = skoolResults.flatMap(r => r.entries);
-      const skoolErrors = skoolResults
+      const externalEntries = externalResults.flatMap(r => r.entries);
+      const externalErrors = externalResults
         .filter(r => r.error)
         .map((r, i) => ({ 
-          feedTitle: skoolSources[i]?.name || 'Skool', 
+          feedTitle: externalSources[i]?.name || 'External', 
           error: r.error! 
         }));
 
-      const allEntries = [...rssEntries, ...skoolEntries];
-      const allErrors = [...rssErrors, ...skoolErrors];
+      const allEntries = [...rssEntries, ...externalEntries];
+      const allErrors = [...rssErrors, ...externalErrors];
 
       // Update last sync time
       const now = new Date();
@@ -296,7 +296,7 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
             className={`${styles.syncButton} ${syncing ? styles.syncing : ''}`}
             onClick={handleSync}
             title="Sync"
-            disabled={syncing || (feedCount === 0 && skoolSources.length === 0)}
+            disabled={syncing || (feedCount === 0 && externalSources.length === 0)}
           >
             <FontAwesomeIcon icon={faSync} spin={syncing} />
           </button>

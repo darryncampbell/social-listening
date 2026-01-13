@@ -1,12 +1,17 @@
 .container {
-  width: 100%;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 80%;
 }
 
 .title {
-  font-size: 0.9375rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin-bottom: 1.25rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0 0 1rem 0;
 }
 
 .list {

@@ -26,12 +26,9 @@ function checkApiKeyRateLimit(request: NextRequest): NextResponse | null {
 
 /**
  * GET - Check if an API key is configured (doesn't reveal the key)
+ * No rate limiting for this read-only endpoint
  */
-export async function GET(request: NextRequest) {
-  // Rate limiting
-  const rateLimitError = checkApiKeyRateLimit(request);
-  if (rateLimitError) return rateLimitError;
-
+export async function GET() {
   const cookieStore = await cookies();
   const apiKey = cookieStore.get(COOKIE_NAME)?.value;
   

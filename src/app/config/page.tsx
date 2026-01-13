@@ -1,7 +1,7 @@
 import FeedList from '@/components/FeedList';
 import ApiKeyConfig from '@/components/ApiKeyConfig';
 import InterestConfig from '@/components/InterestConfig';
-import SkoolConfig from '@/components/SkoolConfig';
+import ExternalSourcesConfig from '@/components/ExternalSourcesConfig';
 import Link from 'next/link';
 import styles from './page.module.css';
 
@@ -11,7 +11,7 @@ export default function ConfigPage() {
       <ApiKeyConfig />
       <InterestConfig />
       <FeedList />
-      <SkoolConfig />
+      <ExternalSourcesConfig />
       <div className={styles.footer}>
         <Link href="/" className={styles.doneButton}>
           Done

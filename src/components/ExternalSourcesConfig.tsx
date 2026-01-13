@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSave, faEdit, faTrash, faPlus } from '@fortawesome/free-solid-svg-icons';
-import { getSkoolSources, saveSkoolSources, isValidSkoolUrl, SkoolSource } from '@/utils/skoolConfig';
+import { getExternalSources, saveExternalSources, isValidExternalUrl, getSupportedHostsList, ExternalSource } from '@/utils/externalSourcesConfig';
 import ConfirmModal from './ConfirmModal';
-import styles from './SkoolConfig.module.css';
+import styles from './ExternalSourcesConfig.module.css';
 
-export default function SkoolConfig() {
-  const [sources, setSources] = useState<SkoolSource[]>([]);
+export default function ExternalSourcesConfig() {
+  const [sources, setSources] = useState<ExternalSource[]>([]);
   const [mounted, setMounted] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showNewRow, setShowNewRow] = useState(false);
@@ -20,16 +20,16 @@ export default function SkoolConfig() {
   const [editUrl, setEditUrl] = useState('');
   const [editNameError, setEditNameError] = useState('');
   const [editUrlError, setEditUrlError] = useState('');
-  const [deleteConfirm, setDeleteConfirm] = useState<SkoolSource | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<ExternalSource | null>(null);
 
   useEffect(() => {
-    setSources(getSkoolSources());
+    setSources(getExternalSources());
     setMounted(true);
   }, []);
 
   useEffect(() => {
     if (mounted) {
-      saveSkoolSources(sources);
+      saveExternalSources(sources);
     }
   }, [sources, mounted]);
 
@@ -51,7 +51,7 @@ export default function SkoolConfig() {
       setNewNameError('');
     }
 
-    const urlValidation = isValidSkoolUrl(newUrl.trim());
+    const urlValidation = isValidExternalUrl(newUrl.trim());
     if (!newUrl.trim()) {
       setNewUrlError('Please enter a URL');
       hasError = true;
@@ -81,7 +81,7 @@ export default function SkoolConfig() {
     setNewUrlError('');
   };
 
-  const handleEdit = (source: SkoolSource) => {
+  const handleEdit = (source: ExternalSource) => {
     setEditingId(source.id);
     setEditName(source.name);
     setEditUrl(source.url);
@@ -99,7 +99,7 @@ export default function SkoolConfig() {
       setEditNameError('');
     }
 
-    const urlValidation = isValidSkoolUrl(editUrl.trim());
+    const urlValidation = isValidExternalUrl(editUrl.trim());
     if (!editUrl.trim()) {
       setEditUrlError('Please enter a URL');
       hasError = true;
@@ -128,7 +128,7 @@ export default function SkoolConfig() {
     setEditUrlError('');
   };
 
-  const handleDelete = (source: SkoolSource) => {
+  const handleDelete = (source: ExternalSource) => {
     setDeleteConfirm(source);
   };
 
@@ -152,9 +152,10 @@ export default function SkoolConfig() {
 
   return (
     <div className={styles.container}>
-      <h2 className={styles.title}>Skool Community Sources</h2>
+      <h2 className={styles.title}>External Website Sources</h2>
       <p className={styles.description}>
-        Add Skool.com community URLs to scrape posts during sync. Only skool.com URLs are supported.
+        Add external website URLs to scrape for content during sync. 
+        Supported websites: {getSupportedHostsList()}.
       </p>
 
       <div className={styles.list}>
@@ -167,7 +168,7 @@ export default function SkoolConfig() {
                     <input
                       type="text"
                       className={`${styles.input} ${editNameError ? styles.inputError : ''}`}
-                      placeholder="Community name..."
+                      placeholder="Source name..."
                       value={editName}
                       onChange={(e) => {
                         setEditName(e.target.value);
@@ -182,7 +183,7 @@ export default function SkoolConfig() {
                     <input
                       type="url"
                       className={`${styles.input} ${editUrlError ? styles.inputError : ''}`}
-                      placeholder="https://www.skool.com/..."
+                      placeholder="https://..."
                       value={editUrl}
                       onChange={(e) => {
                         setEditUrl(e.target.value);
@@ -258,7 +259,7 @@ export default function SkoolConfig() {
                 <input
                   type="text"
                   className={`${styles.input} ${newNameError ? styles.inputError : ''}`}
-                  placeholder="Community name..."
+                  placeholder="Source name..."
                   value={newName}
                   onChange={(e) => {
                     setNewName(e.target.value);
@@ -273,7 +274,7 @@ export default function SkoolConfig() {
                 <input
                   type="url"
                   className={`${styles.input} ${newUrlError ? styles.inputError : ''}`}
-                  placeholder="https://www.skool.com/..."
+                  placeholder="https://..."
                   value={newUrl}
                   onChange={(e) => {
                     setNewUrl(e.target.value);
@@ -306,14 +307,14 @@ export default function SkoolConfig() {
         {!showNewRow && (
           <button className={styles.addButton} onClick={handleAddNew}>
             <FontAwesomeIcon icon={faPlus} />
-            <span>Add Skool Community</span>
+            <span>Add External Website</span>
           </button>
         )}
       </div>
 
       {deleteConfirm && (
         <ConfirmModal
-          title="Delete Skool Source"
+          title="Delete External Source"
           message={`Are you sure you want to delete "${deleteConfirm.name}"? This action cannot be undone.`}
           onConfirm={confirmDelete}
           onCancel={() => setDeleteConfirm(null)}
