@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck, faBan, faUndo, faExternalLinkAlt, faChevronDown, faChevronUp, faSpinner, faWandMagicSparkles, faRedo, faLink, faComment, faCodeBranch, faTrash, faBullhorn } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faBan, faUndo, faExternalLinkAlt, faChevronDown, faChevronUp, faSpinner, faWandMagicSparkles, faRedo, faLink, faComment, faCodeBranch, faTrash, faBullhorn, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
 import { RssEntry } from '@/utils/rssParser';
 import {
@@ -20,6 +20,26 @@ import styles from './FeedEntries.module.css';
 /**
  * Format a date string to a user-friendly format like "9th January 2026 15:50"
  */
+/**
+ * Check if an entry is from F5 Bot and older than 72 hours
+ */
+function isF5BotEntryOlderThan72Hours(entry: RssEntry): boolean {
+  // Check if it's an F5 Bot entry (case-insensitive check for "f5" in feed title)
+  const isF5Bot = entry.feedTitle?.toLowerCase().includes('f5');
+  if (!isF5Bot) return false;
+  
+  // Check if it's older than 72 hours
+  const dateString = entry.publishedDate;
+  if (!dateString) return false;
+  
+  const entryDate = new Date(dateString);
+  if (isNaN(entryDate.getTime())) return false;
+  
+  const now = new Date();
+  const hoursOld = (now.getTime() - entryDate.getTime()) / (1000 * 60 * 60);
+  return hoursOld > 72;
+}
+
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return dateString;
@@ -884,7 +904,15 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, is
         <div className={styles.entryText}>
           <div className={styles.entryMeta}>
             {entry.publishedDate && (
-              <span className={styles.entryDate}>{formatDate(entry.publishedDate)}</span>
+              <span className={styles.entryDate}>
+                {formatDate(entry.publishedDate)}
+                {isF5BotEntryOlderThan72Hours(entry) && (
+                  <span className={styles.oldEntryWarning}>
+                    <FontAwesomeIcon icon={faExclamationTriangle} />
+                    <span>&gt;72 hours old</span>
+                  </span>
+                )}
+              </span>
             )}
             {typeof entry.rawDetails?.lastCommentTime === 'string' && entry.rawDetails.lastCommentTime && (
               <span className={styles.entryLastComment}>
