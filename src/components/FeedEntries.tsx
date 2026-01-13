@@ -587,6 +587,19 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, is
   // Determine if this is a comment or article
   const isComment = isRedditComment(entry.link);
 
+  // Build prompt preview for hover tooltip
+  const promptPreview = useMemo(() => {
+    const basePrompt = isComment ? getCommentPrompt() : getPrompt();
+    const displayTitle = entry.og?.ogTitle || entry.title || 'Untitled';
+    const displayDescription = entry.og?.ogDescription || entry.description || '';
+    
+    // Replace placeholders with actual values
+    return basePrompt
+      .replace(/\$\{url\}/g, entry.link || '')
+      .replace(/\$\{title\}/g, displayTitle)
+      .replace(/\$\{description\}/g, displayDescription);
+  }, [isComment, entry.link, entry.og?.ogTitle, entry.og?.ogDescription, entry.title, entry.description]);
+
   const handleGenerateAiReply = async () => {
     setGenerating(true);
     setAiError(null);
@@ -871,28 +884,31 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, is
                 </div>
               )}
               {status === 'to_process' && (
-                <button
-                  className={styles.generateAiBtn}
-                  onClick={handleGenerateAiReply}
-                  disabled={generating}
-                >
-                  {generating ? (
+                <div className={styles.generateAiBtnWrapper}>
+                  <button
+                    className={styles.generateAiBtn}
+                    onClick={handleGenerateAiReply}
+                    disabled={generating}
+                  >
+                    {generating ? (
+                      <>
+                        <FontAwesomeIcon icon={faSpinner} spin />
+                        <span>Generating...</span>
+                      </>
+                    ) : hasAiResponse ? (
+                      <>
+                        <FontAwesomeIcon icon={faRedo} />
+                        <span>Regenerate {isComment ? 'Comment' : 'Article'} Response</span>
+                      </>
+                  ) : (
                     <>
-                      <FontAwesomeIcon icon={faSpinner} spin />
-                      <span>Generating...</span>
+                      <FontAwesomeIcon icon={faWandMagicSparkles} />
+                      <span>Generate {isComment ? 'Comment' : 'Article'} Response</span>
                     </>
-                  ) : hasAiResponse ? (
-                    <>
-                      <FontAwesomeIcon icon={faRedo} />
-                      <span>Regenerate {isComment ? 'Comment' : 'Article'} Response</span>
-                    </>
-                ) : (
-                  <>
-                    <FontAwesomeIcon icon={faWandMagicSparkles} />
-                    <span>Generate {isComment ? 'Comment' : 'Article'} Response</span>
-                  </>
-                )}
-                </button>
+                  )}
+                  </button>
+                  <div className={styles.promptTooltip}>{promptPreview}</div>
+                </div>
               )}
             </div>
           )}
