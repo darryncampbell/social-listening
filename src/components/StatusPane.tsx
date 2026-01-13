@@ -29,7 +29,6 @@ interface StatusPaneProps {
 }
 
 export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, onTagFiltersChange, entries }: StatusPaneProps) {
-  const [feedCount, setFeedCount] = useState<number>(0);
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [externalSources, setExternalSources] = useState<ExternalSource[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
@@ -73,10 +72,9 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
         const parsedFeeds = JSON.parse(storedFeeds);
         if (Array.isArray(parsedFeeds)) {
           setFeeds(parsedFeeds);
-          setFeedCount(parsedFeeds.length);
         }
       } catch {
-        setFeedCount(0);
+        // Failed to parse feeds, leave as empty array
       }
     }
 
@@ -274,8 +272,8 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
       <div className={styles.pane}>
         <div className={styles.stats}>
           <div className={styles.stat}>
-            <span className={styles.label}>Feeds</span>
-            <span className={styles.value}>{feedCount}</span>
+            <span className={styles.label}>Sources</span>
+            <span className={styles.value}>{feeds.length + externalSources.length}</span>
           </div>
           <div className={styles.divider} />
           <div className={styles.stat}>
@@ -296,7 +294,7 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
             className={`${styles.syncButton} ${syncing ? styles.syncing : ''}`}
             onClick={handleSync}
             title="Sync"
-            disabled={syncing || (feedCount === 0 && externalSources.length === 0)}
+            disabled={syncing || (feeds.length === 0 && externalSources.length === 0)}
           >
             <FontAwesomeIcon icon={faSync} spin={syncing} />
           </button>
