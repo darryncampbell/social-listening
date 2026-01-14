@@ -4,6 +4,7 @@ const STORAGE_KEY = 'social-listening-external-sources';
 // Each entry maps hostname patterns to a human-readable name
 export const SUPPORTED_HOSTS: { pattern: RegExp; name: string }[] = [
   { pattern: /^(www\.)?skool\.com$/, name: 'Skool' },
+  { pattern: /^(www\.)?stackoverflow\.com$/, name: 'Stack Overflow' },
 ];
 
 export interface ExternalSource {

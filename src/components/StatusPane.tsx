@@ -9,7 +9,7 @@ import { fetchAndParseFeed, RssEntry } from '@/utils/rssParser';
 import { TagFilters, TagType, ContentTagType, StatusTagType, CONTENT_TAG_LABELS, STATUS_TAG_LABELS, toggleFilterState, getFeedFilterState } from '@/utils/tagFilter';
 import { getInterest, fetchEnvConfig, getPredefinedFeeds, getPredefinedExternalSources } from '@/utils/interestConfig';
 import { getExternalSources, ExternalSource } from '@/utils/externalSourcesConfig';
-import { SkoolPost } from '@/app/api/scrape/route';
+import { SkoolPost, StackOverflowPost } from '@/app/api/scrape/route';
 import { loadEntries } from '@/utils/entryStorage';
 
 const FEEDS_STORAGE_KEY = 'social-listening-feeds';
@@ -204,6 +204,7 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
         ogImage: post.authorAvatar,
         ogSiteName: 'Skool',
       } : undefined,
+      ogLoading: false, // Prevent OG fetcher from overriding
       rawDetails: {
         author: post.author,
         authorAvatar: post.authorAvatar,
@@ -212,6 +213,50 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
         comments: post.comments,
         lastCommentTime: post.lastCommentTime,
         isPinned: post.isPinned,
+        originalDescription: post.description,
+      },
+    };
+  };
+
+  // Convert Stack Overflow posts to RssEntry format
+  const convertStackOverflowPostToRssEntry = (post: StackOverflowPost): RssEntry => {
+    // Create a description that includes all the scraped metadata
+    const tagsList = post.tags.length > 0 ? `Tags: ${post.tags.join(', ')}` : '';
+    const metaInfo = [
+      `⬆️ ${post.votes} votes`,
+      `💬 ${post.answers} answers${post.hasAcceptedAnswer ? ' ✓' : ''}`,
+      `👁️ ${post.views} views`,
+    ].filter(Boolean).join(' • ');
+
+    const fullDescription = [
+      post.description,
+      tagsList,
+      metaInfo,
+    ].filter(Boolean).join('\n\n');
+
+    return {
+      id: post.id,
+      feedId: `stackoverflow-${post.sourceUrl}`,
+      feedTitle: post.sourceName,
+      rawXml: '',
+      link: post.link,
+      title: post.title,
+      publishedDate: post.date || '',
+      description: fullDescription,
+      og: {
+        ogImage: '/stackoverflow-logo.svg',
+        ogSiteName: 'Stack Overflow',
+      },
+      ogLoading: false, // Prevent OG fetcher from overriding
+      rawDetails: {
+        author: post.author,
+        authorReputation: post.authorReputation,
+        date: post.date,
+        tags: post.tags,
+        votes: post.votes,
+        answers: post.answers,
+        views: post.views,
+        hasAcceptedAnswer: post.hasAcceptedAnswer,
         originalDescription: post.description,
       },
     };
@@ -231,11 +276,19 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
       }
 
       const data = await response.json();
-      const entries = (data.posts || []).map(convertSkoolPostToRssEntry);
-      return { entries };
+      
+      // Route to appropriate converter based on site type
+      if (data.siteType === 'stackoverflow') {
+        const entries = (data.posts || []).map(convertStackOverflowPostToRssEntry);
+        return { entries };
+      } else {
+        // Default: Skool
+        const entries = (data.posts || []).map(convertSkoolPostToRssEntry);
+        return { entries };
+      }
     } catch (error) {
-      console.error('Skool scrape error:', error);
-      return { entries: [], error: 'Failed to scrape Skool community' };
+      console.error('External source scrape error:', error);
+      return { entries: [], error: 'Failed to scrape external source' };
     }
   };
 
@@ -305,6 +358,11 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
 
       // For partial syncs, preserve entries from the source type we didn't sync
       let allEntries: RssEntry[];
+      
+      // Helper to check if an entry is from an external source (scraped, not RSS)
+      const isExternalEntry = (e: RssEntry) => 
+        e.feedId?.startsWith('skool-') || e.feedId?.startsWith('stackoverflow-');
+      
       if (syncType === 'all') {
         // Full sync: replace everything
         allEntries = [...rssEntries, ...externalEntries];
@@ -313,12 +371,12 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
         const existingEntries = loadEntries();
         
         if (syncType === 'rss') {
-          // Keep existing external entries (feedId starts with 'skool-')
-          const existingExternalEntries = existingEntries.filter(e => e.feedId?.startsWith('skool-'));
+          // Keep existing external entries
+          const existingExternalEntries = existingEntries.filter(isExternalEntry);
           allEntries = [...rssEntries, ...existingExternalEntries];
         } else {
-          // Keep existing RSS entries (feedId does NOT start with 'skool-')
-          const existingRssEntries = existingEntries.filter(e => !e.feedId?.startsWith('skool-'));
+          // Keep existing RSS entries (not from external sources)
+          const existingRssEntries = existingEntries.filter(e => !isExternalEntry(e));
           allEntries = [...existingRssEntries, ...externalEntries];
         }
       }

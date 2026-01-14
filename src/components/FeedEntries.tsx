@@ -955,8 +955,8 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, is
       
       <div className={styles.entryContent}>
         {displayImage && (
-          <div className={`${styles.entryImageWrapper} ${displayImage === '/reddit-logo.svg' ? styles.redditImageWrapper : ''} ${displayImage === '/hackernews-logo.svg' ? styles.hackerNewsImageWrapper : ''}`}>
-            <img src={displayImage} alt="" className={`${styles.entryImage} ${displayImage === '/reddit-logo.svg' ? styles.redditImage : ''} ${displayImage === '/hackernews-logo.svg' ? styles.hackerNewsImage : ''}`} />
+          <div className={`${styles.entryImageWrapper} ${displayImage === '/reddit-logo.svg' ? styles.redditImageWrapper : ''} ${displayImage === '/hackernews-logo.svg' ? styles.hackerNewsImageWrapper : ''} ${displayImage === '/stackoverflow-logo.svg' ? styles.stackOverflowImageWrapper : ''}`}>
+            <img src={displayImage} alt="" className={`${styles.entryImage} ${displayImage === '/reddit-logo.svg' ? styles.redditImage : ''} ${displayImage === '/hackernews-logo.svg' ? styles.hackerNewsImage : ''} ${displayImage === '/stackoverflow-logo.svg' ? styles.stackOverflowImage : ''}`} />
           </div>
         )}
         <div className={styles.entryText}>

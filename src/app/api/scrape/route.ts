@@ -58,15 +58,259 @@ export interface SkoolPost {
   sourceName: string;
 }
 
-function isValidSkoolUrl(urlString: string): boolean {
+export interface StackOverflowPost {
+  id: string;
+  author: string;
+  authorReputation?: string;
+  title: string;
+  description: string;
+  tags: string[];
+  date: string;
+  link: string;
+  votes: number;
+  answers: number;
+  views: number;
+  hasAcceptedAnswer: boolean;
+  sourceUrl: string;
+  sourceName: string;
+}
+
+type SiteType = 'skool' | 'stackoverflow' | 'unknown';
+
+function detectSiteType(urlString: string): SiteType {
   try {
     const url = new URL(urlString);
-    return (
-      (url.protocol === 'http:' || url.protocol === 'https:') &&
-      (url.hostname === 'www.skool.com' || url.hostname === 'skool.com')
-    );
+    const hostname = url.hostname.toLowerCase();
+    
+    if (hostname === 'www.skool.com' || hostname === 'skool.com') {
+      return 'skool';
+    }
+    if (hostname === 'www.stackoverflow.com' || hostname === 'stackoverflow.com') {
+      return 'stackoverflow';
+    }
+    return 'unknown';
   } catch {
-    return false;
+    return 'unknown';
+  }
+}
+
+function isValidSkoolUrl(urlString: string): boolean {
+  return detectSiteType(urlString) === 'skool';
+}
+
+function isValidStackOverflowUrl(urlString: string): boolean {
+  return detectSiteType(urlString) === 'stackoverflow';
+}
+
+async function scrapeStackOverflow(url: string, sourceName?: string): Promise<NextResponse> {
+  let browser;
+  try {
+    console.log('[Scrape:SO] Starting scrape for URL:', url);
+    console.log('[Scrape:SO] Environment:', isServerless ? 'serverless' : 'local');
+    
+    console.log('[Scrape:SO] Launching browser...');
+    browser = await getBrowser();
+    console.log('[Scrape:SO] Browser launched successfully');
+
+    const page = await browser.newPage();
+    console.log('[Scrape:SO] New page created');
+    
+    // Set a reasonable user agent
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    );
+
+    // Navigate to the page
+    console.log('[Scrape:SO] Navigating to page...');
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 10000 });
+    console.log('[Scrape:SO] Page loaded (domcontentloaded)');
+
+    // Wait for question list to load
+    console.log('[Scrape:SO] Waiting for content selectors...');
+    const selectorFound = await page.waitForSelector('.s-post-summary, #questions .question-summary', { timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    console.log('[Scrape:SO] Selector found:', selectorFound);
+
+    // Extract posts from Stack Overflow
+    console.log('[Scrape:SO] Extracting posts...');
+    const posts = await page.evaluate((sourceUrl: string, srcName: string) => {
+      // Stack Overflow uses .s-post-summary for question items
+      const questionElements = document.querySelectorAll('.s-post-summary');
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const results: any[] = [];
+
+      questionElements.forEach((question) => {
+        try {
+          // Extract question ID from data attribute or link
+          const questionLink = question.querySelector('.s-post-summary--content-title a, .s-link') as HTMLAnchorElement;
+          const href = questionLink?.getAttribute('href') || '';
+          const idMatch = href.match(/\/questions\/(\d+)/);
+          const id = idMatch ? `so-${idMatch[1]}` : `so-${Date.now()}-${Math.random()}`;
+
+          // Extract title
+          const titleEl = question.querySelector('.s-post-summary--content-title a, .s-link');
+          const title = titleEl?.textContent?.trim() || '';
+
+          // Extract description/excerpt
+          const excerptEl = question.querySelector('.s-post-summary--content-excerpt');
+          const description = excerptEl?.textContent?.trim() || '';
+
+          // Extract stats (votes, answers, views)
+          const statsContainer = question.querySelector('.s-post-summary--stats');
+          let votes = 0;
+          let answers = 0;
+          let views = 0;
+          let hasAcceptedAnswer = false;
+
+          if (statsContainer) {
+            const statItems = statsContainer.querySelectorAll('.s-post-summary--stats-item');
+            statItems.forEach(item => {
+              const valueEl = item.querySelector('.s-post-summary--stats-item-number');
+              const value = parseInt(valueEl?.textContent?.trim() || '0') || 0;
+              const itemText = item.textContent?.toLowerCase() || '';
+              
+              if (itemText.includes('vote')) {
+                votes = value;
+              } else if (itemText.includes('answer')) {
+                answers = value;
+                // Check for accepted answer (has specific class)
+                if (item.classList.contains('has-accepted-answer') || 
+                    item.querySelector('.has-accepted-answer') ||
+                    item.classList.contains('is-green')) {
+                  hasAcceptedAnswer = true;
+                }
+              } else if (itemText.includes('view')) {
+                views = value;
+              }
+            });
+          }
+
+          // Extract tags
+          const tagElements = question.querySelectorAll('.s-post-summary--meta-tags .s-tag, .post-tag');
+          const tags: string[] = [];
+          tagElements.forEach(tag => {
+            const tagText = tag.textContent?.trim();
+            if (tagText) tags.push(tagText);
+          });
+
+          // Extract author info
+          const userCard = question.querySelector('.s-user-card, .user-info');
+          let author = 'Unknown';
+          let authorReputation = '';
+          
+          if (userCard) {
+            const authorEl = userCard.querySelector('.s-user-card--link a, .user-details a');
+            author = authorEl?.textContent?.trim() || 'Unknown';
+            
+            const repEl = userCard.querySelector('.s-user-card--rep, .reputation-score');
+            authorReputation = repEl?.textContent?.trim() || '';
+          }
+
+          // Extract date
+          const timeEl = question.querySelector('.s-user-card--time .relativetime, .relativetime');
+          let date = '';
+          if (timeEl) {
+            // Try to get the title attribute which has the full date
+            const titleAttr = timeEl.getAttribute('title');
+            if (titleAttr) {
+              const parsed = new Date(titleAttr);
+              if (!isNaN(parsed.getTime())) {
+                date = parsed.toISOString();
+              }
+            }
+            // Fallback: parse the relative time text
+            if (!date) {
+              const relativeText = timeEl.textContent?.trim() || '';
+              // Simple relative time parsing
+              const now = new Date();
+              if (relativeText.includes('min')) {
+                const mins = parseInt(relativeText) || 0;
+                now.setMinutes(now.getMinutes() - mins);
+                date = now.toISOString();
+              } else if (relativeText.includes('hour')) {
+                const hours = parseInt(relativeText) || 0;
+                now.setHours(now.getHours() - hours);
+                date = now.toISOString();
+              } else if (relativeText.includes('day')) {
+                const days = parseInt(relativeText) || 0;
+                now.setDate(now.getDate() - days);
+                date = now.toISOString();
+              } else if (relativeText.includes('yesterday')) {
+                now.setDate(now.getDate() - 1);
+                date = now.toISOString();
+              }
+            }
+          }
+
+          // Build full link
+          const link = questionLink?.href || (href.startsWith('/') ? `https://stackoverflow.com${href}` : href);
+
+          // Only add if we have meaningful content
+          if (title) {
+            results.push({
+              id,
+              author,
+              authorReputation,
+              title,
+              description: description.substring(0, 500),
+              tags,
+              date,
+              link,
+              votes,
+              answers,
+              views,
+              hasAcceptedAnswer,
+              sourceUrl,
+              sourceName: srcName
+            });
+          }
+        } catch (e) {
+          // Skip this question if extraction fails
+          console.error('Question extraction error:', e);
+        }
+      });
+
+      return results;
+    }, url, sourceName || 'Stack Overflow');
+
+    console.log('[Scrape:SO] Posts extracted:', posts.length);
+    if (posts.length > 0) {
+      console.log('[Scrape:SO] First post sample:', JSON.stringify(posts[0], null, 2));
+    }
+
+    await browser.close();
+    console.log('[Scrape:SO] Browser closed');
+
+    const response = {
+      success: true,
+      posts,
+      postCount: posts.length,
+      siteType: 'stackoverflow',
+    };
+    console.log('[Scrape:SO] Returning response with', posts.length, 'posts');
+    
+    return NextResponse.json(response);
+
+  } catch (error) {
+    if (browser) {
+      await browser.close();
+    }
+
+    console.error('Stack Overflow scrape error:', error);
+    
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      return NextResponse.json(
+        { error: 'Page load timed out' },
+        { status: 504 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to scrape Stack Overflow page' },
+      { status: 500 }
+    );
   }
 }
 
@@ -101,13 +345,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'URL is required' }, { status: 400 });
   }
 
-  if (!isValidSkoolUrl(url)) {
+  const siteType = detectSiteType(url);
+  
+  if (siteType === 'unknown') {
     return NextResponse.json(
-      { error: 'Only skool.com URLs are supported' },
+      { error: 'Only skool.com and stackoverflow.com URLs are supported' },
       { status: 403 }
     );
   }
 
+  // Route to appropriate scraper
+  if (siteType === 'stackoverflow') {
+    return scrapeStackOverflow(url, sourceName);
+  }
+
+  // Default: Skool scraper
   let browser;
   try {
     console.log('[Scrape] Starting scrape for URL:', url);

@@ -286,6 +286,19 @@
   padding: 0;
 }
 
+/* Stack Overflow-specific image styling */
+.stackOverflowImageWrapper {
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.stackOverflowImage {
+  object-fit: contain;
+  padding: 0;
+}
+
 .entryText {
   flex: 1;
   min-width: 0;

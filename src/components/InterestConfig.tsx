@@ -165,7 +165,7 @@ export default function InterestConfig() {
 
       {/* Recognized Users Subsection */}
       <div className={styles.subsection}>
-        <h3 className={styles.subsectionTitle}>Recognized Users</h3>
+        <h3 className={styles.subsectionTitle}>Recognized Users (Reddit only)</h3>
         <p className={styles.subsectionDescription}>
           List of usernames treated as &quot;recognized users&quot;. Add a real name to display alongside the username.
         </p>

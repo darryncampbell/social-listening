@@ -149,10 +149,14 @@ export default function Home() {
         .map(e => [e.id, e.og])
     );
 
-    // Apply existing OG data to new entries
+    // Apply existing OG data to new entries, but prefer new OG data if it has an image
     const entriesWithExistingOg = newEntries.map(entry => {
       const existingOg = existingOgMap.get(entry.id);
       if (existingOg) {
+        // If new entry already has OG data with an image, keep it (don't override with cached data)
+        if (entry.og?.ogImage) {
+          return { ...entry, ogLoading: false };
+        }
         return { ...entry, og: existingOg, ogLoading: false };
       }
       return entry;
