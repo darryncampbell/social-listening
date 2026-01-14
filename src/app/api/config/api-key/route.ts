@@ -29,6 +29,16 @@ function checkApiKeyRateLimit(request: NextRequest): NextResponse | null {
  * No rate limiting for this read-only endpoint
  */
 export async function GET() {
+  // Check for environment variable first
+  const envApiKey = process.env.OPENAI_API_KEY;
+  if (envApiKey) {
+    return NextResponse.json({
+      configured: true,
+      preview: `${envApiKey.slice(0, 4)}...${envApiKey.slice(-4)}`,
+      isEnvOverride: true,
+    });
+  }
+
   const cookieStore = await cookies();
   const apiKey = cookieStore.get(COOKIE_NAME)?.value;
   
@@ -36,6 +46,7 @@ export async function GET() {
     configured: !!apiKey,
     // Return masked preview for UI feedback (first 4 + last 4 chars)
     preview: apiKey ? `${apiKey.slice(0, 4)}...${apiKey.slice(-4)}` : null,
+    isEnvOverride: false,
   });
 }
 

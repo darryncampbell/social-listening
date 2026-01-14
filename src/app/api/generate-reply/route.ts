@@ -34,9 +34,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Read API key from HTTP-only cookie (secure, not accessible via JS)
-    const cookieStore = await cookies();
-    const apiKey = cookieStore.get(API_KEY_COOKIE)?.value;
+    // Check for environment variable first, then fall back to cookie
+    let apiKey = process.env.OPENAI_API_KEY;
+    
+    if (!apiKey) {
+      // Read API key from HTTP-only cookie (secure, not accessible via JS)
+      const cookieStore = await cookies();
+      apiKey = cookieStore.get(API_KEY_COOKIE)?.value;
+    }
 
     if (!apiKey) {
       return new Response(

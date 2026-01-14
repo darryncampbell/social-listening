@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEye, faEyeSlash, faCheck, faTrash, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { faEye, faEyeSlash, faCheck, faTrash, faSpinner, faLock } from '@fortawesome/free-solid-svg-icons';
 import styles from './ApiKeyConfig.module.css';
 
 export default function ApiKeyConfig() {
@@ -10,6 +10,7 @@ export default function ApiKeyConfig() {
   const [showKey, setShowKey] = useState(false);
   const [hasStoredKey, setHasStoredKey] = useState(false);
   const [keyPreview, setKeyPreview] = useState<string | null>(null);
+  const [isEnvOverride, setIsEnvOverride] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +24,7 @@ export default function ApiKeyConfig() {
         const data = await response.json();
         setHasStoredKey(data.configured);
         setKeyPreview(data.preview);
+        setIsEnvOverride(data.isEnvOverride || false);
       } catch {
         // Silently fail - key not configured
       } finally {
@@ -114,8 +116,25 @@ export default function ApiKeyConfig() {
       {error && (
         <div className={styles.error}>{error}</div>
       )}
-      
-      {hasStoredKey ? (
+
+      {isEnvOverride ? (
+        // Key is set via environment variable - show locked state
+        <div className={styles.envOverrideSection}>
+          <div className={styles.envNotice}>
+            <FontAwesomeIcon icon={faLock} className={styles.lockIcon} />
+            <span>This value is set via the <code>OPENAI_API_KEY</code> environment variable and cannot be changed here.</span>
+          </div>
+          <div className={styles.configuredRow}>
+            <div className={styles.keyPreview}>
+              <span className={styles.keyPreviewLabel}>Current key:</span>
+              <code className={styles.keyPreviewValue}>{keyPreview}</code>
+            </div>
+          </div>
+          <p className={styles.statusText}>
+            ✓ API key is configured via environment variable
+          </p>
+        </div>
+      ) : hasStoredKey ? (
         // Key is configured - show preview and clear button
         <div className={styles.configuredRow}>
           <div className={styles.keyPreview}>
@@ -174,7 +193,7 @@ export default function ApiKeyConfig() {
         </div>
       )}
       
-      {hasStoredKey && (
+      {hasStoredKey && !isEnvOverride && (
         <p className={styles.statusText}>
           ✓ API key is securely stored
         </p>

@@ -171,3 +171,35 @@
   color: var(--foreground);
   background: transparent;
 }
+
+.envOverrideSection {
+  /* Container for env override state */
+}
+
+.envNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  margin-bottom: 1rem;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: var(--warning-text);
+  line-height: 1.5;
+}
+
+.envNotice code {
+  background: var(--code-bg);
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-size: 0.8rem;
+}
+
+.lockIcon {
+  color: var(--warning-icon);
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
