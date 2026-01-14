@@ -141,13 +141,22 @@ export default function Home() {
     newEntries: RssEntry[],
     newErrors: Array<{ feedTitle: string; error: string }>
   ) => {
-    // Merge with existing OG data if we have it
+    // Get existing entries to preserve historical data
     const existingEntries = loadEntries();
+    
+    // Create a map of existing OG data for reuse
     const existingOgMap = new Map(
       existingEntries
         .filter(e => e.og)
         .map(e => [e.id, e.og])
     );
+
+    // Create a set of new entry URLs for quick lookup
+    const newEntryUrls = new Set(newEntries.map(e => e.link));
+    
+    // Find historical entries that are NOT in the new sync (they "fell off" the feed)
+    // These are entries we want to preserve
+    const historicalEntries = existingEntries.filter(e => !newEntryUrls.has(e.link));
 
     // Apply existing OG data to new entries, but prefer new OG data if it has an image
     const entriesWithExistingOg = newEntries.map(entry => {
@@ -162,8 +171,12 @@ export default function Home() {
       return entry;
     });
 
+    // Combine new entries with historical entries
+    // New entries come first so they take precedence in deduplication when dates are equal
+    const allEntries = [...entriesWithExistingOg, ...historicalEntries];
+
     // Deduplicate entries by URL, keeping the most recent version
-    const deduplicatedEntries = deduplicateEntries(entriesWithExistingOg);
+    const deduplicatedEntries = deduplicateEntries(allEntries);
 
     setEntries(deduplicatedEntries);
     setErrors(newErrors);
