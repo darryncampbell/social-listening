@@ -160,6 +160,66 @@
   background: var(--accent-alpha);
 }
 
+/* Locked state for environment variable sources */
+.rowLocked {
+  position: relative;
+  padding-left: 2rem;
+}
+
+.lockIndicator {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--warning-icon, #ca8a04);
+  font-size: 0.875rem;
+}
+
+.inputLocked {
+  background: var(--disabled-bg);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Section headers for predefined vs custom sources */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.sectionHeader:first-of-type {
+  margin-top: 0;
+}
+
+.sectionTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.sectionBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: 4px;
+  color: var(--warning-text);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 @media (max-width: 768px) {
   .container {
     width: 100%;

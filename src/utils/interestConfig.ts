@@ -9,9 +9,16 @@ export interface PredefinedFeed {
   url: string;
 }
 
+export interface PredefinedExternalSource {
+  id: string;
+  name: string;
+  url: string;
+}
+
 interface EnvConfig {
   interest: string | null;
   predefinedFeeds: PredefinedFeed[] | null;
+  predefinedExternalSources: PredefinedExternalSource[] | null;
 }
 
 // Cache for environment variable overrides
@@ -39,7 +46,7 @@ export async function fetchEnvConfig(): Promise<EnvConfig> {
     })
     .catch(() => {
       // On error, return empty config (no overrides)
-      const emptyConfig: EnvConfig = { interest: null, predefinedFeeds: null };
+      const emptyConfig: EnvConfig = { interest: null, predefinedFeeds: null, predefinedExternalSources: null };
       envConfigCache = emptyConfig;
       return emptyConfig;
     });
@@ -77,6 +84,21 @@ export function hasPredefinedFeeds(): boolean {
   return (envConfigCache?.predefinedFeeds?.length ?? 0) > 0;
 }
 
+/**
+ * Gets predefined external sources from environment variable.
+ * Returns empty array if no predefined external sources are set.
+ */
+export function getPredefinedExternalSources(): PredefinedExternalSource[] {
+  return envConfigCache?.predefinedExternalSources || [];
+}
+
+/**
+ * Checks if there are any predefined external sources from environment variable.
+ */
+export function hasPredefinedExternalSources(): boolean {
+  return (envConfigCache?.predefinedExternalSources?.length ?? 0) > 0;
+}
+
 export function getInterest(): string {
   if (typeof window === 'undefined') return DEFAULT_INTEREST;
   // If env override is set, use that
@@ -96,32 +118,74 @@ export function resetInterest(): void {
   localStorage.removeItem(INTEREST_STORAGE_KEY);
 }
 
-// Recognized users functions
-export function getRecognizedUsers(): string[] {
+// Recognized users types and functions
+export interface RecognizedUser {
+  username: string;
+  realName: string;
+}
+
+/**
+ * Get recognized users from localStorage.
+ * Handles backward compatibility: converts old string[] format to new RecognizedUser[] format.
+ */
+export function getRecognizedUsers(): RecognizedUser[] {
   if (typeof window === 'undefined') return [];
   try {
     const stored = localStorage.getItem(RECOGNIZED_USERS_STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
+    if (!stored) return [];
+    
+    const parsed = JSON.parse(stored);
+    
+    // Handle backward compatibility: convert string[] to RecognizedUser[]
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      if (typeof parsed[0] === 'string') {
+        // Old format: string[]
+        const migrated: RecognizedUser[] = parsed.map((username: string) => ({
+          username: username,
+          realName: '',
+        }));
+        // Save in new format
+        saveRecognizedUsers(migrated);
+        return migrated;
+      }
+      // New format: RecognizedUser[]
+      return parsed;
+    }
+    
+    return [];
   } catch {
     return [];
   }
 }
 
-export function saveRecognizedUsers(users: string[]): void {
+export function saveRecognizedUsers(users: RecognizedUser[]): void {
   if (typeof window === 'undefined') return;
-  // Filter out empty strings and trim whitespace
+  // Filter out users with empty usernames and trim whitespace
   const cleanedUsers = users
-    .map(u => u.trim())
-    .filter(u => u.length > 0);
+    .map(u => ({
+      username: u.username.trim(),
+      realName: u.realName.trim(),
+    }))
+    .filter(u => u.username.length > 0);
   localStorage.setItem(RECOGNIZED_USERS_STORAGE_KEY, JSON.stringify(cleanedUsers));
 }
 
-export function addRecognizedUser(username: string): void {
+export function addRecognizedUser(username: string, realName: string = ''): void {
   if (typeof window === 'undefined') return;
   const users = getRecognizedUsers();
-  const trimmed = username.trim();
-  if (trimmed && !users.includes(trimmed)) {
-    users.push(trimmed);
+  const trimmedUsername = username.trim();
+  const normalizedUsername = trimmedUsername.toLowerCase().replace(/^u\//, '');
+  
+  // Check if user already exists (case-insensitive, ignoring u/ prefix)
+  const exists = users.some(u => 
+    u.username.toLowerCase().replace(/^u\//, '') === normalizedUsername
+  );
+  
+  if (trimmedUsername && !exists) {
+    users.push({
+      username: trimmedUsername,
+      realName: realName.trim(),
+    });
     saveRecognizedUsers(users);
   }
 }
@@ -129,14 +193,29 @@ export function addRecognizedUser(username: string): void {
 export function removeRecognizedUser(username: string): void {
   if (typeof window === 'undefined') return;
   const users = getRecognizedUsers();
-  const filtered = users.filter(u => u !== username);
+  const filtered = users.filter(u => u.username !== username);
   saveRecognizedUsers(filtered);
 }
 
-export function isRecognizedUser(username: string): boolean {
+/**
+ * Find a recognized user by username (case-insensitive, tolerant of u/ prefix).
+ * Returns the RecognizedUser object if found, or null otherwise.
+ */
+export function findRecognizedUser(username: string): RecognizedUser | null {
+  if (!username) return null;
   const users = getRecognizedUsers();
-  const trimmed = username.trim().toLowerCase();
-  return users.some(u => u.toLowerCase() === trimmed);
+  const normalizedUsername = username.trim().toLowerCase().replace(/^u\//, '');
+  
+  return users.find(u => 
+    u.username.toLowerCase().replace(/^u\//, '') === normalizedUsername
+  ) || null;
+}
+
+/**
+ * Check if a username is recognized (case-insensitive, tolerant of u/ prefix).
+ */
+export function isRecognizedUser(username: string): boolean {
+  return findRecognizedUser(username) !== null;
 }
 
 export { DEFAULT_INTEREST };

@@ -7,7 +7,7 @@ import styles from './StatusPane.module.css';
 import PromptModal, { PromptType } from './PromptModal';
 import { fetchAndParseFeed, RssEntry } from '@/utils/rssParser';
 import { TagFilters, TagType, ContentTagType, StatusTagType, CONTENT_TAG_LABELS, STATUS_TAG_LABELS, toggleFilterState, getFeedFilterState } from '@/utils/tagFilter';
-import { getInterest, fetchEnvConfig, getPredefinedFeeds } from '@/utils/interestConfig';
+import { getInterest, fetchEnvConfig, getPredefinedFeeds, getPredefinedExternalSources } from '@/utils/interestConfig';
 import { getExternalSources, ExternalSource } from '@/utils/externalSourcesConfig';
 import { SkoolPost } from '@/app/api/scrape/route';
 import { loadEntries } from '@/utils/entryStorage';
@@ -71,8 +71,9 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
   }, [lastSyncDate]);
 
   useEffect(() => {
-    // Load feeds (including predefined from env vars)
+    // Load feeds and external sources (including predefined from env vars)
     fetchEnvConfig().then(() => {
+      // Load feeds
       const predefinedFeeds = getPredefinedFeeds();
       const storedFeeds = localStorage.getItem(FEEDS_STORAGE_KEY);
       let customFeeds: Feed[] = [];
@@ -90,11 +91,14 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
       
       // Combine predefined and custom feeds
       setFeeds([...predefinedFeeds, ...customFeeds]);
-    });
 
-    // Load external sources
-    const sources = getExternalSources();
-    setExternalSources(sources);
+      // Load external sources (including predefined from env vars)
+      const predefinedExternalSources = getPredefinedExternalSources();
+      const customExternalSources = getExternalSources();
+      
+      // Combine predefined and custom external sources
+      setExternalSources([...predefinedExternalSources, ...customExternalSources]);
+    });
 
     // Load last sync time
     const storedSyncTime = localStorage.getItem(SYNC_TIME_STORAGE_KEY);

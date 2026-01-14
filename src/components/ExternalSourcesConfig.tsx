@@ -2,14 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSave, faEdit, faTrash, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faSave, faEdit, faTrash, faPlus, faLock } from '@fortawesome/free-solid-svg-icons';
 import { getExternalSources, saveExternalSources, isValidExternalUrl, getSupportedHostsList, ExternalSource } from '@/utils/externalSourcesConfig';
+import { fetchEnvConfig, getPredefinedExternalSources, PredefinedExternalSource } from '@/utils/interestConfig';
 import ConfirmModal from './ConfirmModal';
 import styles from './ExternalSourcesConfig.module.css';
 
 export default function ExternalSourcesConfig() {
   const [sources, setSources] = useState<ExternalSource[]>([]);
+  const [predefinedSources, setPredefinedSources] = useState<PredefinedExternalSource[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showNewRow, setShowNewRow] = useState(false);
   const [newName, setNewName] = useState('');
@@ -23,8 +26,12 @@ export default function ExternalSourcesConfig() {
   const [deleteConfirm, setDeleteConfirm] = useState<ExternalSource | null>(null);
 
   useEffect(() => {
-    setSources(getExternalSources());
-    setMounted(true);
+    fetchEnvConfig().then(() => {
+      setPredefinedSources(getPredefinedExternalSources());
+      setSources(getExternalSources());
+      setMounted(true);
+      setLoading(false);
+    });
   }, []);
 
   useEffect(() => {
@@ -148,7 +155,16 @@ export default function ExternalSourcesConfig() {
     }
   };
 
-  if (!mounted) return null;
+  if (!mounted || loading) {
+    return (
+      <div className={styles.container}>
+        <h2 className={styles.title}>External Website Sources</h2>
+        <p className={styles.description}>Loading...</p>
+      </div>
+    );
+  }
+
+  const hasPredefined = predefinedSources.length > 0;
 
   return (
     <div className={styles.container}>
@@ -158,6 +174,54 @@ export default function ExternalSourcesConfig() {
         Supported websites: {getSupportedHostsList()}.
       </p>
 
+      {/* Predefined sources from environment variable */}
+      {hasPredefined && (
+        <>
+          <div className={styles.sectionHeader}>
+            <h3 className={styles.sectionTitle}>Predefined Sources</h3>
+            <span className={styles.sectionBadge}>From environment variable</span>
+          </div>
+          <div className={styles.list}>
+            {predefinedSources.map((source) => (
+              <div key={source.id} className={`${styles.row} ${styles.rowLocked}`}>
+                <div className={styles.lockIndicator} title="Defined by environment variable">
+                  <FontAwesomeIcon icon={faLock} />
+                </div>
+                <div className={styles.fields}>
+                  <div className={`${styles.inputWrapper} ${styles.nameWrapper}`}>
+                    <input
+                      type="text"
+                      className={`${styles.input} ${styles.inputLocked}`}
+                      value={source.name}
+                      disabled
+                      readOnly
+                    />
+                  </div>
+                  <div className={`${styles.inputWrapper} ${styles.urlWrapper}`}>
+                    <input
+                      type="url"
+                      className={`${styles.input} ${styles.inputLocked}`}
+                      value={source.url}
+                      disabled
+                      readOnly
+                    />
+                  </div>
+                </div>
+                <div className={styles.actions}>
+                  {/* No actions for locked sources */}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Custom sources section */}
+      {hasPredefined && (
+        <div className={styles.sectionHeader}>
+          <h3 className={styles.sectionTitle}>Custom Sources</h3>
+        </div>
+      )}
       <div className={styles.list}>
         {sources.map((source) => (
           <div key={source.id} className={styles.row}>

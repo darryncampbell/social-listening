@@ -14,7 +14,7 @@ import {
 } from '@/utils/entryState';
 import { getAiResponse, saveAiResponse } from '@/utils/aiResponseStorage';
 import { getPrompt, getCommentPrompt } from '@/utils/promptConfig';
-import { getInterest, getRecognizedUsers } from '@/utils/interestConfig';
+import { getInterest, getRecognizedUsers, findRecognizedUser, RecognizedUser } from '@/utils/interestConfig';
 import {
   getCachedAuthor,
   setCachedAuthor,
@@ -384,7 +384,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
   // Store Reddit authors keyed by URL
   const [redditAuthors, setRedditAuthors] = useState<Map<string, string>>(new Map());
   // Store recognized users list
-  const [recognizedUsers, setRecognizedUsers] = useState<string[]>([]);
+  const [recognizedUsers, setRecognizedUsers] = useState<RecognizedUser[]>([]);
 
   // Load interest configuration on mount
   useEffect(() => {
@@ -630,7 +630,7 @@ interface EntryTableProps {
   highlightedCrossPost: string | null;
   onCrossPostClick: (description: string) => void;
   redditAuthors: Map<string, string>;
-  recognizedUsers: string[];
+  recognizedUsers: RecognizedUser[];
 }
 
 function EntryTable({ id, title, entries, status, onAction, crossPostDescriptions, interest, highlightedCrossPost, onCrossPostClick, redditAuthors, recognizedUsers }: EntryTableProps) {
@@ -676,17 +676,23 @@ interface EntryRowProps {
   highlightedCrossPost: string | null;
   onCrossPostClick: (description: string) => void;
   redditAuthor?: string;
-  recognizedUsers: string[];
+  recognizedUsers: RecognizedUser[];
+}
+
+// Find a recognized user by username (tolerant of u/ prefix)
+// Returns the RecognizedUser object if found, or null otherwise
+function findUserRecognized(username: string, recognizedUsers: RecognizedUser[]): RecognizedUser | null {
+  if (!username) return null;
+  const normalizedUsername = username.toLowerCase().replace(/^u\//, '');
+  return recognizedUsers.find(user => {
+    const normalizedRecognized = user.username.toLowerCase().replace(/^u\//, '');
+    return normalizedUsername === normalizedRecognized;
+  }) || null;
 }
 
 // Check if a username matches any recognized user (tolerant of u/ prefix)
-function isUserRecognized(username: string, recognizedUsers: string[]): boolean {
-  if (!username) return false;
-  const normalizedUsername = username.toLowerCase().replace(/^u\//, '');
-  return recognizedUsers.some(recognized => {
-    const normalizedRecognized = recognized.toLowerCase().replace(/^u\//, '');
-    return normalizedUsername === normalizedRecognized;
-  });
+function isUserRecognized(username: string, recognizedUsers: RecognizedUser[]): boolean {
+  return findUserRecognized(username, recognizedUsers) !== null;
 }
 
 function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, isIndented, isDummyParent, highlightedCrossPost, onCrossPostClick, redditAuthor, recognizedUsers }: EntryRowProps) {
@@ -966,24 +972,31 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, is
                 Last activity: {formatDate(entry.rawDetails.lastCommentTime)}
               </span>
             )}
-            {redditAuthor && (
-              <span className={styles.entryAuthor}>
-                by <a 
-                  href={`https://www.reddit.com/user/${redditAuthor}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`${styles.entryAuthorLink} ${isUserRecognized(redditAuthor, recognizedUsers) ? styles.entryAuthorRecognized : ''}`}
-                >
-                  {isUserRecognized(redditAuthor, recognizedUsers) && (
-                    <FontAwesomeIcon icon={faCrown} className={styles.crownIconLeft} />
-                  )}
-                  u/{redditAuthor}
-                  {isUserRecognized(redditAuthor, recognizedUsers) && (
-                    <FontAwesomeIcon icon={faCrown} className={styles.crownIconRight} />
-                  )}
-                </a>
-              </span>
-            )}
+            {redditAuthor && (() => {
+              const recognizedUser = findUserRecognized(redditAuthor, recognizedUsers);
+              const isRecognized = recognizedUser !== null;
+              const realName = recognizedUser?.realName || '';
+              
+              return (
+                <span className={styles.entryAuthor}>
+                  by <a 
+                    href={`https://www.reddit.com/user/${redditAuthor}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${styles.entryAuthorLink} ${isRecognized ? styles.entryAuthorRecognized : ''}`}
+                  >
+                    {isRecognized && (
+                      <FontAwesomeIcon icon={faCrown} className={styles.crownIconLeft} />
+                    )}
+                    u/{redditAuthor}
+                    {realName && <span className={styles.authorRealName}> ({realName})</span>}
+                    {isRecognized && (
+                      <FontAwesomeIcon icon={faCrown} className={styles.crownIconRight} />
+                    )}
+                  </a>
+                </span>
+              );
+            })()}
             {entry.og?.ogSiteName && (
               <span className={styles.entrySiteName}>{entry.og.ogSiteName}</span>
             )}

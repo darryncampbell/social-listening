@@ -365,6 +365,17 @@
   filter: drop-shadow(0 1px 2px rgba(245, 158, 11, 0.3));
 }
 
+.authorRealName {
+  font-weight: 400;
+  /* Reset the transparent text fill from the gradient effect */
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  -webkit-text-fill-color: #f59e0b;
+  color: #f59e0b;
+  opacity: 0.85;
+}
+
 .entrySiteName {
   font-size: 0.75rem;
   color: var(--text-muted);

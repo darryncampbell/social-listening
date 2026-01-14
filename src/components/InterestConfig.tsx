@@ -13,14 +13,16 @@ import {
   removeRecognizedUser,
   fetchEnvConfig,
   isInterestEnvOverridden,
+  RecognizedUser,
 } from '@/utils/interestConfig';
 import styles from './InterestConfig.module.css';
 
 export default function InterestConfig() {
   const [interest, setInterest] = useState('');
   const [saved, setSaved] = useState(false);
-  const [recognizedUsers, setRecognizedUsers] = useState<string[]>([]);
+  const [recognizedUsers, setRecognizedUsers] = useState<RecognizedUser[]>([]);
   const [newUsername, setNewUsername] = useState('');
+  const [newRealName, setNewRealName] = useState('');
   const [isEnvOverridden, setIsEnvOverridden] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -54,18 +56,23 @@ export default function InterestConfig() {
   };
 
   const handleAddUser = () => {
-    const trimmed = newUsername.trim();
-    if (!trimmed) return;
+    const trimmedUsername = newUsername.trim();
+    if (!trimmedUsername) return;
     
-    // Check if already exists (case-insensitive)
-    if (recognizedUsers.some(u => u.toLowerCase() === trimmed.toLowerCase())) {
+    // Check if already exists (case-insensitive, ignoring u/ prefix)
+    const normalizedNew = trimmedUsername.toLowerCase().replace(/^u\//, '');
+    if (recognizedUsers.some(u => 
+      u.username.toLowerCase().replace(/^u\//, '') === normalizedNew
+    )) {
       setNewUsername('');
+      setNewRealName('');
       return;
     }
     
-    addRecognizedUser(trimmed);
+    addRecognizedUser(trimmedUsername, newRealName.trim());
     setRecognizedUsers(getRecognizedUsers());
     setNewUsername('');
+    setNewRealName('');
   };
 
   const handleRemoveUser = (username: string) => {
@@ -146,17 +153,25 @@ export default function InterestConfig() {
       <div className={styles.subsection}>
         <h3 className={styles.subsectionTitle}>Recognized Users</h3>
         <p className={styles.subsectionDescription}>
-          List of usernames treated as &quot;recognized users&quot;
+          List of usernames treated as &quot;recognized users&quot;. Add a real name to show in tooltips.
         </p>
         
-        <div className={styles.inputRow}>
+        <div className={styles.userInputRow}>
           <input
             type="text"
             value={newUsername}
             onChange={(e) => setNewUsername(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Enter a username..."
-            className={styles.input}
+            placeholder="Username (e.g., u/johndoe)"
+            className={`${styles.input} ${styles.usernameInput}`}
+          />
+          <input
+            type="text"
+            value={newRealName}
+            onChange={(e) => setNewRealName(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Real name (optional)"
+            className={`${styles.input} ${styles.realNameInput}`}
           />
           <button
             className={`${styles.actionButton} ${styles.addButton}`}
@@ -171,13 +186,16 @@ export default function InterestConfig() {
 
         {recognizedUsers.length > 0 && (
           <div className={styles.userList}>
-            {recognizedUsers.map((username) => (
-              <div key={username} className={styles.userTag}>
-                <span className={styles.userName}>{username}</span>
+            {recognizedUsers.map((user) => (
+              <div key={user.username} className={styles.userTag} title={user.realName || undefined}>
+                <span className={styles.userName}>
+                  {user.username}
+                  {user.realName && <span className={styles.userRealName}> ({user.realName})</span>}
+                </span>
                 <button
                   className={styles.removeUserBtn}
-                  onClick={() => handleRemoveUser(username)}
-                  title={`Remove ${username}`}
+                  onClick={() => handleRemoveUser(user.username)}
+                  title={`Remove ${user.username}`}
                 >
                   <FontAwesomeIcon icon={faXmark} />
                 </button>

@@ -167,6 +167,21 @@
   cursor: not-allowed;
 }
 
+/* Two-field input row for recognized users */
+.userInputRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.usernameInput {
+  flex: 0 0 200px;
+}
+
+.realNameInput {
+  flex: 1;
+}
+
 /* User list */
 .userList {
   display: flex;
@@ -189,6 +204,11 @@
 
 .userName {
   font-weight: 500;
+}
+
+.userRealName {
+  font-weight: 400;
+  opacity: 0.8;
 }
 
 .removeUserBtn {
