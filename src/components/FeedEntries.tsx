@@ -452,8 +452,8 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
             }
           }
           
-          // Small delay between requests to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // 1 second delay between requests (Reddit OAuth allows 60 req/min)
+          await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (error) {
           console.error('Error fetching Reddit author for', url, error);
         }

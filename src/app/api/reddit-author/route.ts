@@ -1,5 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Cache the access token in memory (serverless functions can reuse this)
+let cachedToken: { token: string; expiresAt: number } | null = null;
+
+// Get an OAuth access token from Reddit
+async function getAccessToken(): Promise<string | null> {
+  const clientId = process.env.REDDIT_CLIENT_ID;
+  const clientSecret = process.env.REDDIT_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    console.error('Reddit OAuth credentials not configured');
+    return null;
+  }
+
+  // Check if we have a valid cached token
+  if (cachedToken && Date.now() < cachedToken.expiresAt) {
+    return cachedToken.token;
+  }
+
+  try {
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    
+    const response = await fetch('https://www.reddit.com/api/v1/access_token', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'SocialListeningApp/1.0',
+      },
+      body: 'grant_type=client_credentials',
+    });
+
+    if (!response.ok) {
+      console.error('Failed to get Reddit access token:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    
+    if (data.access_token) {
+      // Cache the token (expires_in is in seconds, subtract 60s for safety margin)
+      cachedToken = {
+        token: data.access_token,
+        expiresAt: Date.now() + (data.expires_in - 60) * 1000,
+      };
+      return data.access_token;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error getting Reddit access token:', error);
+    return null;
+  }
+}
+
 // Check if the URL is a comment URL and extract the comment ID
 function extractCommentId(url: string): string | null {
   // Comment URLs look like: /r/subreddit/comments/postId/c/commentId
@@ -28,7 +82,7 @@ function findCommentById(comments: any[], commentId: string): any | null {
   return null;
 }
 
-// Fetch the author of a Reddit post or comment using Reddit's JSON API
+// Fetch the author of a Reddit post or comment using Reddit's OAuth API
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const redditUrl = searchParams.get('url');
@@ -43,28 +97,36 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Get OAuth access token
+    const accessToken = await getAccessToken();
+    
+    if (!accessToken) {
+      return NextResponse.json(
+        { error: 'Reddit OAuth not configured or failed to authenticate' },
+        { status: 503 }
+      );
+    }
+
     // Check if this is a comment URL
     const commentId = extractCommentId(redditUrl);
     
-    // Clean the URL and append .json
-    let jsonUrl = redditUrl.trim();
+    // Convert www.reddit.com URL to oauth.reddit.com API endpoint
+    // Extract the path from the URL
+    const urlObj = new URL(redditUrl);
+    let apiPath = urlObj.pathname;
+    
     // Remove trailing slash if present
-    if (jsonUrl.endsWith('/')) {
-      jsonUrl = jsonUrl.slice(0, -1);
+    if (apiPath.endsWith('/')) {
+      apiPath = apiPath.slice(0, -1);
     }
-    // Remove any query parameters
-    jsonUrl = jsonUrl.split('?')[0];
-    // Append .json
-    jsonUrl = `${jsonUrl}.json`;
+    
+    // Build the OAuth API URL
+    const apiUrl = `https://oauth.reddit.com${apiPath}.json`;
 
-    const response = await fetch(jsonUrl, {
+    const response = await fetch(apiUrl, {
       headers: {
-        // Use browser-like headers to avoid being blocked by Reddit
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
+        'Authorization': `Bearer ${accessToken}`,
+        'User-Agent': 'SocialListeningApp/1.0',
       },
     });
 
@@ -72,6 +134,31 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { error: 'Rate limited by Reddit', retryAfter: response.headers.get('Retry-After') },
         { status: 429 }
+      );
+    }
+
+    if (response.status === 401) {
+      // Token expired, clear cache and retry once
+      cachedToken = null;
+      const newToken = await getAccessToken();
+      if (newToken) {
+        const retryResponse = await fetch(apiUrl, {
+          headers: {
+            'Authorization': `Bearer ${newToken}`,
+            'User-Agent': 'SocialListeningApp/1.0',
+          },
+        });
+        if (retryResponse.ok) {
+          const data = await retryResponse.json();
+          const author = extractAuthor(data, commentId);
+          if (author) {
+            return NextResponse.json({ author, url: redditUrl });
+          }
+        }
+      }
+      return NextResponse.json(
+        { error: 'Reddit authentication failed' },
+        { status: 401 }
       );
     }
 
@@ -83,31 +170,7 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
-
-    let author: string | null = null;
-
-    if (Array.isArray(data) && data.length > 0) {
-      if (commentId) {
-        // This is a comment URL - find the specific comment
-        // Comments are in the second element of the array
-        const commentsData = data[1]?.data?.children;
-        if (commentsData) {
-          const comment = findCommentById(commentsData, commentId);
-          if (comment?.author) {
-            author = comment.author;
-          }
-        }
-      } else {
-        // This is a post URL - get the post author
-        const postData = data[0]?.data?.children?.[0]?.data;
-        if (postData?.author) {
-          author = postData.author;
-        }
-      }
-    } else if (data?.data?.children?.[0]?.data?.author) {
-      // Single listing format
-      author = data.data.children[0].data.author;
-    }
+    const author = extractAuthor(data, commentId);
 
     if (author) {
       return NextResponse.json({ author, url: redditUrl });
@@ -124,4 +187,34 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Extract author from Reddit API response
+function extractAuthor(data: any, commentId: string | null): string | null {
+  let author: string | null = null;
+
+  if (Array.isArray(data) && data.length > 0) {
+    if (commentId) {
+      // This is a comment URL - find the specific comment
+      // Comments are in the second element of the array
+      const commentsData = data[1]?.data?.children;
+      if (commentsData) {
+        const comment = findCommentById(commentsData, commentId);
+        if (comment?.author) {
+          author = comment.author;
+        }
+      }
+    } else {
+      // This is a post URL - get the post author
+      const postData = data[0]?.data?.children?.[0]?.data;
+      if (postData?.author) {
+        author = postData.author;
+      }
+    }
+  } else if (data?.data?.children?.[0]?.data?.author) {
+    // Single listing format
+    author = data.data.children[0].data.author;
+  }
+
+  return author;
 }
