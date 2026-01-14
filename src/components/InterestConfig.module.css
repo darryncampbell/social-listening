@@ -237,3 +237,51 @@
   font-style: italic;
   margin: 0.5rem 0 0 0;
 }
+
+/* Section headers for predefined vs custom users */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  margin-top: 1rem;
+}
+
+.sectionHeader:first-of-type {
+  margin-top: 0;
+}
+
+.sectionTitle {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.sectionBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.625rem;
+  font-weight: 500;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: 4px;
+  color: var(--warning-text);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* Locked user tag styling */
+.userTagLocked {
+  background: var(--disabled-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-text);
+  padding-left: 0.5rem;
+}
+
+.userLockIcon {
+  font-size: 0.625rem;
+  margin-right: 0.375rem;
+  opacity: 0.8;
+}

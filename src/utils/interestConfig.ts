@@ -15,10 +15,16 @@ export interface PredefinedExternalSource {
   url: string;
 }
 
+export interface PredefinedRecognizedUser {
+  username: string;
+  realName: string;
+}
+
 interface EnvConfig {
   interest: string | null;
   predefinedFeeds: PredefinedFeed[] | null;
   predefinedExternalSources: PredefinedExternalSource[] | null;
+  predefinedRecognizedUsers: PredefinedRecognizedUser[] | null;
 }
 
 // Cache for environment variable overrides
@@ -46,7 +52,7 @@ export async function fetchEnvConfig(): Promise<EnvConfig> {
     })
     .catch(() => {
       // On error, return empty config (no overrides)
-      const emptyConfig: EnvConfig = { interest: null, predefinedFeeds: null, predefinedExternalSources: null };
+      const emptyConfig: EnvConfig = { interest: null, predefinedFeeds: null, predefinedExternalSources: null, predefinedRecognizedUsers: null };
       envConfigCache = emptyConfig;
       return emptyConfig;
     });
@@ -97,6 +103,21 @@ export function getPredefinedExternalSources(): PredefinedExternalSource[] {
  */
 export function hasPredefinedExternalSources(): boolean {
   return (envConfigCache?.predefinedExternalSources?.length ?? 0) > 0;
+}
+
+/**
+ * Gets predefined recognized users from environment variable.
+ * Returns empty array if no predefined recognized users are set.
+ */
+export function getPredefinedRecognizedUsers(): PredefinedRecognizedUser[] {
+  return envConfigCache?.predefinedRecognizedUsers || [];
+}
+
+/**
+ * Checks if there are any predefined recognized users from environment variable.
+ */
+export function hasPredefinedRecognizedUsers(): boolean {
+  return (envConfigCache?.predefinedRecognizedUsers?.length ?? 0) > 0;
 }
 
 export function getInterest(): string {

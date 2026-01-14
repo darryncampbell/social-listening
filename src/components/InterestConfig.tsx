@@ -14,6 +14,8 @@ import {
   fetchEnvConfig,
   isInterestEnvOverridden,
   RecognizedUser,
+  getPredefinedRecognizedUsers,
+  PredefinedRecognizedUser,
 } from '@/utils/interestConfig';
 import styles from './InterestConfig.module.css';
 
@@ -21,6 +23,7 @@ export default function InterestConfig() {
   const [interest, setInterest] = useState('');
   const [saved, setSaved] = useState(false);
   const [recognizedUsers, setRecognizedUsers] = useState<RecognizedUser[]>([]);
+  const [predefinedUsers, setPredefinedUsers] = useState<PredefinedRecognizedUser[]>([]);
   const [newUsername, setNewUsername] = useState('');
   const [newRealName, setNewRealName] = useState('');
   const [isEnvOverridden, setIsEnvOverridden] = useState(false);
@@ -32,6 +35,7 @@ export default function InterestConfig() {
       setInterest(getInterest());
       setIsEnvOverridden(isInterestEnvOverridden());
       setRecognizedUsers(getRecognizedUsers());
+      setPredefinedUsers(getPredefinedRecognizedUsers());
       setLoading(false);
     });
   }, []);
@@ -59,9 +63,18 @@ export default function InterestConfig() {
     const trimmedUsername = newUsername.trim();
     if (!trimmedUsername) return;
     
-    // Check if already exists (case-insensitive, ignoring u/ prefix)
+    // Check if already exists in custom users (case-insensitive, ignoring u/ prefix)
     const normalizedNew = trimmedUsername.toLowerCase().replace(/^u\//, '');
     if (recognizedUsers.some(u => 
+      u.username.toLowerCase().replace(/^u\//, '') === normalizedNew
+    )) {
+      setNewUsername('');
+      setNewRealName('');
+      return;
+    }
+
+    // Also check predefined users
+    if (predefinedUsers.some(u => 
       u.username.toLowerCase().replace(/^u\//, '') === normalizedNew
     )) {
       setNewUsername('');
@@ -88,6 +101,7 @@ export default function InterestConfig() {
   };
 
   const isDefault = interest === DEFAULT_INTEREST;
+  const hasPredefinedUsers = predefinedUsers.length > 0;
 
   if (loading) {
     return (
@@ -153,8 +167,36 @@ export default function InterestConfig() {
       <div className={styles.subsection}>
         <h3 className={styles.subsectionTitle}>Recognized Users</h3>
         <p className={styles.subsectionDescription}>
-          List of usernames treated as &quot;recognized users&quot;. Add a real name to show in tooltips.
+          List of usernames treated as &quot;recognized users&quot;. Add a real name to display alongside the username.
         </p>
+
+        {/* Predefined users from environment variable */}
+        {hasPredefinedUsers && (
+          <>
+            <div className={styles.sectionHeader}>
+              <h4 className={styles.sectionTitle}>Predefined Users</h4>
+              <span className={styles.sectionBadge}>From environment variable</span>
+            </div>
+            <div className={styles.userList}>
+              {predefinedUsers.map((user) => (
+                <div key={`env-${user.username}`} className={`${styles.userTag} ${styles.userTagLocked}`}>
+                  <FontAwesomeIcon icon={faLock} className={styles.userLockIcon} />
+                  <span className={styles.userName}>
+                    {user.username}
+                    {user.realName && <span className={styles.userRealName}> ({user.realName})</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Custom users section */}
+        {hasPredefinedUsers && (
+          <div className={styles.sectionHeader}>
+            <h4 className={styles.sectionTitle}>Custom Users</h4>
+          </div>
+        )}
         
         <div className={styles.userInputRow}>
           <input
@@ -187,7 +229,7 @@ export default function InterestConfig() {
         {recognizedUsers.length > 0 && (
           <div className={styles.userList}>
             {recognizedUsers.map((user) => (
-              <div key={user.username} className={styles.userTag} title={user.realName || undefined}>
+              <div key={user.username} className={styles.userTag}>
                 <span className={styles.userName}>
                   {user.username}
                   {user.realName && <span className={styles.userRealName}> ({user.realName})</span>}
@@ -204,7 +246,7 @@ export default function InterestConfig() {
           </div>
         )}
 
-        {recognizedUsers.length === 0 && (
+        {recognizedUsers.length === 0 && !hasPredefinedUsers && (
           <p className={styles.emptyList}>No recognized users added yet.</p>
         )}
       </div>

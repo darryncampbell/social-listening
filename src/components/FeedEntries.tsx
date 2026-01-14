@@ -14,7 +14,7 @@ import {
 } from '@/utils/entryState';
 import { getAiResponse, saveAiResponse } from '@/utils/aiResponseStorage';
 import { getPrompt, getCommentPrompt } from '@/utils/promptConfig';
-import { getInterest, getRecognizedUsers, findRecognizedUser, RecognizedUser } from '@/utils/interestConfig';
+import { getInterest, getRecognizedUsers, findRecognizedUser, RecognizedUser, getPredefinedRecognizedUsers, fetchEnvConfig } from '@/utils/interestConfig';
 import {
   getCachedAuthor,
   setCachedAuthor,
@@ -388,8 +388,13 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
 
   // Load interest configuration on mount
   useEffect(() => {
-    setInterest(getInterest());
-    setRecognizedUsers(getRecognizedUsers());
+    fetchEnvConfig().then(() => {
+      setInterest(getInterest());
+      // Combine predefined and custom recognized users
+      const predefinedUsers = getPredefinedRecognizedUsers();
+      const customUsers = getRecognizedUsers();
+      setRecognizedUsers([...predefinedUsers, ...customUsers]);
+    });
   }, []);
 
   // Fetch Reddit authors asynchronously after entries are loaded

@@ -366,14 +366,13 @@
 }
 
 .authorRealName {
-  font-weight: 400;
+  font-weight: 500;
   /* Reset the transparent text fill from the gradient effect */
   background: none;
   -webkit-background-clip: unset;
   background-clip: unset;
-  -webkit-text-fill-color: #f59e0b;
-  color: #f59e0b;
-  opacity: 0.85;
+  -webkit-text-fill-color: #d97706;
+  color: #d97706;
 }
 
 .entrySiteName {

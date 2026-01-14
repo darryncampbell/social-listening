@@ -12,6 +12,11 @@ interface PredefinedExternalSource {
   url: string;
 }
 
+interface PredefinedRecognizedUser {
+  username: string;
+  realName: string;
+}
+
 /**
  * Parse the SOCIAL_LISTENING_FEEDS environment variable.
  * Format: "Title1|URL1,Title2|URL2"
@@ -79,6 +84,45 @@ function parsePredefinedExternalSources(sourcesEnv: string | undefined): Predefi
 }
 
 /**
+ * Parse the SOCIAL_LISTENING_RECOGNIZED_USERS environment variable.
+ * Format: "username1|RealName1,username2|RealName2"
+ * Real name is optional: "username1,username2|Real Name"
+ * Returns an array of predefined recognized users.
+ */
+function parsePredefinedRecognizedUsers(usersEnv: string | undefined): PredefinedRecognizedUser[] {
+  if (!usersEnv) return [];
+  
+  const users: PredefinedRecognizedUser[] = [];
+  const entries = usersEnv.split(',');
+  
+  for (const entry of entries) {
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+    
+    const pipeIndex = trimmed.indexOf('|');
+    if (pipeIndex === -1) {
+      // No pipe - just username, no real name
+      users.push({
+        username: trimmed,
+        realName: '',
+      });
+    } else {
+      const username = trimmed.substring(0, pipeIndex).trim();
+      const realName = trimmed.substring(pipeIndex + 1).trim();
+      
+      if (username) {
+        users.push({
+          username,
+          realName,
+        });
+      }
+    }
+  }
+  
+  return users;
+}
+
+/**
  * API route to expose environment variable overrides for config.
  * Environment variables take precedence over localStorage values.
  * 
@@ -86,15 +130,18 @@ function parsePredefinedExternalSources(sourcesEnv: string | undefined): Predefi
  * - SOCIAL_LISTENING_INTEREST: Overrides "Company or Person of Interest"
  * - SOCIAL_LISTENING_FEEDS: Predefined RSS feeds (format: "Title1|URL1,Title2|URL2")
  * - SOCIAL_LISTENING_EXTERNAL_SOURCES: Predefined external sources (format: "Name1|URL1,Name2|URL2")
+ * - SOCIAL_LISTENING_RECOGNIZED_USERS: Predefined recognized users (format: "username1|RealName1,username2|RealName2")
  */
 export async function GET() {
   const predefinedFeeds = parsePredefinedFeeds(process.env.SOCIAL_LISTENING_FEEDS);
   const predefinedExternalSources = parsePredefinedExternalSources(process.env.SOCIAL_LISTENING_EXTERNAL_SOURCES);
+  const predefinedRecognizedUsers = parsePredefinedRecognizedUsers(process.env.SOCIAL_LISTENING_RECOGNIZED_USERS);
   
   const envConfig = {
     interest: process.env.SOCIAL_LISTENING_INTEREST || null,
     predefinedFeeds: predefinedFeeds.length > 0 ? predefinedFeeds : null,
     predefinedExternalSources: predefinedExternalSources.length > 0 ? predefinedExternalSources : null,
+    predefinedRecognizedUsers: predefinedRecognizedUsers.length > 0 ? predefinedRecognizedUsers : null,
   };
 
   return NextResponse.json(envConfig);
