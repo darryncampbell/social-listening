@@ -7,7 +7,7 @@ import styles from './StatusPane.module.css';
 import PromptModal, { PromptType } from './PromptModal';
 import { fetchAndParseFeed, RssEntry } from '@/utils/rssParser';
 import { TagFilters, TagType, ContentTagType, StatusTagType, CONTENT_TAG_LABELS, STATUS_TAG_LABELS, toggleFilterState, getFeedFilterState } from '@/utils/tagFilter';
-import { getInterest } from '@/utils/interestConfig';
+import { getInterest, fetchEnvConfig, getPredefinedFeeds } from '@/utils/interestConfig';
 import { getExternalSources, ExternalSource } from '@/utils/externalSourcesConfig';
 import { SkoolPost } from '@/app/api/scrape/route';
 import { loadEntries } from '@/utils/entryStorage';
@@ -71,18 +71,26 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
   }, [lastSyncDate]);
 
   useEffect(() => {
-    // Load feeds
-    const storedFeeds = localStorage.getItem(FEEDS_STORAGE_KEY);
-    if (storedFeeds) {
-      try {
-        const parsedFeeds = JSON.parse(storedFeeds);
-        if (Array.isArray(parsedFeeds)) {
-          setFeeds(parsedFeeds);
+    // Load feeds (including predefined from env vars)
+    fetchEnvConfig().then(() => {
+      const predefinedFeeds = getPredefinedFeeds();
+      const storedFeeds = localStorage.getItem(FEEDS_STORAGE_KEY);
+      let customFeeds: Feed[] = [];
+      
+      if (storedFeeds) {
+        try {
+          const parsedFeeds = JSON.parse(storedFeeds);
+          if (Array.isArray(parsedFeeds)) {
+            customFeeds = parsedFeeds;
+          }
+        } catch {
+          // Failed to parse feeds, leave as empty array
         }
-      } catch {
-        // Failed to parse feeds, leave as empty array
       }
-    }
+      
+      // Combine predefined and custom feeds
+      setFeeds([...predefinedFeeds, ...customFeeds]);
+    });
 
     // Load external sources
     const sources = getExternalSources();

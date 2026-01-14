@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSave, faEdit, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faSave, faEdit, faTrash, faLock } from '@fortawesome/free-solid-svg-icons';
 import styles from './FeedRow.module.css';
 import ConfirmModal from './ConfirmModal';
 
@@ -11,6 +11,7 @@ interface FeedRowProps {
   initialUrl?: string;
   isEditing?: boolean;
   isNew?: boolean;
+  isLocked?: boolean; // For environment variable predefined feeds
   onSave: (title: string, url: string) => void;
   onDelete?: () => void;
 }
@@ -29,6 +30,7 @@ export default function FeedRow({
   initialUrl = '', 
   isEditing: initialEditing = true,
   isNew = false,
+  isLocked = false,
   onSave,
   onDelete
 }: FeedRowProps) {
@@ -90,12 +92,17 @@ export default function FeedRow({
 
   return (
     <>
-      <div className={styles.row}>
+      <div className={`${styles.row} ${isLocked ? styles.rowLocked : ''}`}>
+        {isLocked && (
+          <div className={styles.lockIndicator} title="Defined by environment variable">
+            <FontAwesomeIcon icon={faLock} />
+          </div>
+        )}
         <div className={styles.fields}>
           <div className={`${styles.inputWrapper} ${styles.titleWrapper}`}>
             <input
               type="text"
-              className={`${styles.input} ${titleError ? styles.inputError : ''}`}
+              className={`${styles.input} ${titleError ? styles.inputError : ''} ${isLocked ? styles.inputLocked : ''}`}
               placeholder="Feed title..."
               value={title}
               onChange={(e) => {
@@ -103,7 +110,8 @@ export default function FeedRow({
                 if (titleError) setTitleError('');
               }}
               onKeyDown={handleKeyDown}
-              disabled={!isEditing}
+              disabled={!isEditing || isLocked}
+              readOnly={isLocked}
               aria-label="Feed title"
             />
             {titleError && <span className={styles.error}>{titleError}</span>}
@@ -111,7 +119,7 @@ export default function FeedRow({
           <div className={`${styles.inputWrapper} ${styles.urlWrapper}`}>
             <input
               type="url"
-              className={`${styles.input} ${urlError ? styles.inputError : ''}`}
+              className={`${styles.input} ${urlError ? styles.inputError : ''} ${isLocked ? styles.inputLocked : ''}`}
               placeholder="RSS feed URL..."
               value={url}
               onChange={(e) => {
@@ -119,14 +127,15 @@ export default function FeedRow({
                 if (urlError) setUrlError('');
               }}
               onKeyDown={handleKeyDown}
-              disabled={!isEditing}
+              disabled={!isEditing || isLocked}
+              readOnly={isLocked}
               aria-label="RSS feed URL"
             />
             {urlError && <span className={styles.error}>{urlError}</span>}
           </div>
         </div>
         <div className={styles.actions}>
-          {isEditing && !isNew && onDelete && (
+          {!isLocked && isEditing && !isNew && onDelete && (
             <button
               className={`${styles.actionButton} ${styles.deleteButton}`}
               onClick={handleDeleteClick}
@@ -136,14 +145,16 @@ export default function FeedRow({
               <FontAwesomeIcon icon={faTrash} />
             </button>
           )}
-          <button
-            className={styles.actionButton}
-            onClick={isEditing ? handleSave : handleEdit}
-            title={isEditing ? 'Save' : 'Edit'}
-            aria-label={isEditing ? 'Save feed' : 'Edit feed'}
-          >
-            <FontAwesomeIcon icon={isEditing ? faSave : faEdit} />
-          </button>
+          {!isLocked && (
+            <button
+              className={styles.actionButton}
+              onClick={isEditing ? handleSave : handleEdit}
+              title={isEditing ? 'Save' : 'Edit'}
+              aria-label={isEditing ? 'Save feed' : 'Edit feed'}
+            >
+              <FontAwesomeIcon icon={isEditing ? faSave : faEdit} />
+            </button>
+          )}
         </div>
       </div>
       {showDeleteConfirm && (

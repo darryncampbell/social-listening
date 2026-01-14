@@ -27,12 +27,14 @@ import styles from './FeedEntries.module.css';
  * Format a date string to a user-friendly format like "9th January 2026 15:50"
  */
 /**
- * Check if an entry is from F5 Bot and older than 72 hours
+ * Check if an entry links to Reddit or Hacker News and is older than 72 hours.
+ * These entries may have stale data since the original content could have been updated.
  */
-function isF5BotEntryOlderThan72Hours(entry: RssEntry): boolean {
-  // Check if it's an F5 Bot entry (case-insensitive check for "f5" in feed title)
-  const isF5Bot = entry.feedTitle?.toLowerCase().includes('f5');
-  if (!isF5Bot) return false;
+function isRedditOrHNEntryOlderThan72Hours(entry: RssEntry): boolean {
+  // Check if the entry URL points to Reddit or Hacker News
+  const url = entry.link?.toLowerCase() || '';
+  const isRedditOrHN = url.includes('reddit.com') || url.includes('news.ycombinator');
+  if (!isRedditOrHN) return false;
   
   // Check if it's older than 72 hours
   const dateString = entry.publishedDate;
@@ -951,7 +953,7 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, is
             {entry.publishedDate && (
               <span className={styles.entryDate}>
                 {formatDate(entry.publishedDate)}
-                {isF5BotEntryOlderThan72Hours(entry) && (
+                {isRedditOrHNEntryOlderThan72Hours(entry) && (
                   <span className={styles.oldEntryWarning}>
                     <FontAwesomeIcon icon={faExclamationTriangle} />
                     <span>&gt;72 hours old</span>
