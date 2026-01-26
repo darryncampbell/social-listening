@@ -7,9 +7,11 @@ interface ConfirmModalProps {
   message: string;
   onConfirm: () => void;
   onCancel: () => void;
+  confirmText?: string;
+  cancelText?: string;
 }
 
-export default function ConfirmModal({ title, message, onConfirm, onCancel }: ConfirmModalProps) {
+export default function ConfirmModal({ title, message, onConfirm, onCancel, confirmText = 'Delete', cancelText = 'Cancel' }: ConfirmModalProps) {
   return (
     <div className={styles.overlay} onClick={onCancel}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
@@ -17,10 +19,10 @@ export default function ConfirmModal({ title, message, onConfirm, onCancel }: Co
         <p className={styles.message}>{message}</p>
         <div className={styles.actions}>
           <button className={styles.cancelButton} onClick={onCancel}>
-            Cancel
+            {cancelText}
           </button>
           <button className={styles.confirmButton} onClick={onConfirm}>
-            Delete
+            {confirmText}
           </button>
         </div>
       </div>

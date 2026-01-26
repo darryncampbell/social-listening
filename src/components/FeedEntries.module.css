@@ -325,7 +325,7 @@
 }
 
 .entryDate {
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   color: var(--text-muted);
   display: inline-flex;
   align-items: center;
@@ -341,14 +341,14 @@
 }
 
 .entryLastComment {
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   color: #10b981;
   padding-left: 0.75rem;
   border-left: 1px solid var(--border);
 }
 
 .entryAuthor {
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   color: var(--text-muted);
   padding-left: 0.75rem;
   border-left: 1px solid var(--border);
@@ -402,18 +402,18 @@
 }
 
 .entrySiteName {
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   color: var(--text-muted);
   padding-left: 0.75rem;
   border-left: 1px solid var(--border);
 }
 
 .entryTitle {
-  font-size: 1rem;
+  font-size: 1.125rem;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 0.5rem 0;
-  line-height: 1.4;
+  line-height: 1.5;
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
@@ -432,9 +432,9 @@
 }
 
 .entryDescription {
-  font-size: 0.875rem;
+  font-size: 1rem;
   color: var(--text-secondary);
-  line-height: 1.6;
+  line-height: 1.7;
   margin: 0 0 0.75rem 0;
   display: -webkit-box;
   -webkit-line-clamp: 4;
@@ -537,9 +537,9 @@
 }
 
 .aiResponseText {
-  font-size: 0.875rem;
+  font-size: 1rem;
   color: var(--text-primary);
-  line-height: 1.5;
+  line-height: 1.7;
   white-space: pre-wrap;
 }
 

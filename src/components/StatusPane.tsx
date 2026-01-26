@@ -2,15 +2,17 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash, faChevronDown, faRss, faGlobe, faBullhorn } from '@fortawesome/free-solid-svg-icons';
+import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash, faChevronDown, faRss, faGlobe, faBullhorn, faBan } from '@fortawesome/free-solid-svg-icons';
 import styles from './StatusPane.module.css';
 import PromptModal, { PromptType } from './PromptModal';
+import ConfirmModal from './ConfirmModal';
 import { fetchAndParseFeed, RssEntry } from '@/utils/rssParser';
 import { TagFilters, TagType, ContentTagType, StatusTagType, CONTENT_TAG_LABELS, STATUS_TAG_LABELS, toggleFilterState, getFeedFilterState } from '@/utils/tagFilter';
 import { getInterest, fetchEnvConfig, getPredefinedFeeds, getPredefinedExternalSources } from '@/utils/interestConfig';
 import { getExternalSources, ExternalSource } from '@/utils/externalSourcesConfig';
 import { SkoolPost, StackOverflowPost } from '@/app/api/scrape/route';
 import { loadEntries } from '@/utils/entryStorage';
+import { markAsIgnored, getEntryStatus } from '@/utils/entryState';
 
 const FEEDS_STORAGE_KEY = 'social-listening-feeds';
 const SYNC_TIME_STORAGE_KEY = 'social-listening-last-sync';
@@ -46,6 +48,7 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
   const [filterOpen, setFilterOpen] = useState(false);
   const [syncDropdownOpen, setSyncDropdownOpen] = useState(false);
   const [interest, setInterest] = useState('');
+  const [showIgnoreAllModal, setShowIgnoreAllModal] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
   const syncRef = useRef<HTMLDivElement>(null);
 
@@ -558,6 +561,14 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
             <span>Only show {interest}</span>
           </button>
           <button
+            className={styles.ignoreAllButton}
+            onClick={() => setShowIgnoreAllModal(true)}
+            title="Mark all 'To Process' items as ignored"
+          >
+            <FontAwesomeIcon icon={faBan} />
+            <span>Ignore All</span>
+          </button>
+          <button
             className={styles.promptButton}
             onClick={() => setPromptModalType('article')}
           >
@@ -597,6 +608,31 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
           onClose={() => setPromptModalType(null)}
         />
       )}
+      {showIgnoreAllModal && (() => {
+        // Load all entries from localStorage to get accurate count (not filtered)
+        const allEntries = loadEntries();
+        const toProcessCount = allEntries.filter(e => getEntryStatus(e.id) === 'to_process').length;
+        
+        return (
+          <ConfirmModal
+            title="Ignore All Items"
+            message={`Are you sure you want to mark all ${toProcessCount} 'To Process' items as ignored? This action cannot be undone.`}
+            onConfirm={() => {
+              // Mark all to_process entries as ignored (using all entries, not filtered)
+              const toProcessEntries = allEntries.filter(e => getEntryStatus(e.id) === 'to_process');
+              toProcessEntries.forEach(entry => {
+                markAsIgnored(entry.id);
+              });
+              setShowIgnoreAllModal(false);
+              // Trigger a page refresh to update the UI
+              window.location.reload();
+            }}
+            onCancel={() => setShowIgnoreAllModal(false)}
+            confirmText="Ignore All"
+            cancelText="Cancel"
+          />
+        );
+      })()}
     </>
   );
 }
