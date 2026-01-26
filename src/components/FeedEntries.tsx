@@ -591,6 +591,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
         onCrossPostClick={toggleCrossPostHighlight}
         redditAuthors={redditAuthors}
         recognizedUsers={recognizedUsers}
+        tagFilters={tagFilters}
       />
 
       <EntryTable
@@ -605,6 +606,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
         onCrossPostClick={toggleCrossPostHighlight}
         redditAuthors={redditAuthors}
         recognizedUsers={recognizedUsers}
+        tagFilters={tagFilters}
       />
 
       <EntryTable
@@ -619,6 +621,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
         onCrossPostClick={toggleCrossPostHighlight}
         redditAuthors={redditAuthors}
         recognizedUsers={recognizedUsers}
+        tagFilters={tagFilters}
       />
     </div>
   );
@@ -636,9 +639,19 @@ interface EntryTableProps {
   onCrossPostClick: (description: string) => void;
   redditAuthors: Map<string, string>;
   recognizedUsers: RecognizedUser[];
+  tagFilters: TagFilters;
 }
 
-function EntryTable({ id, title, entries, status, onAction, crossPostDescriptions, interest, highlightedCrossPost, onCrossPostClick, redditAuthors, recognizedUsers }: EntryTableProps) {
+function EntryTable({ id, title, entries, status, onAction, crossPostDescriptions, interest, highlightedCrossPost, onCrossPostClick, redditAuthors, recognizedUsers, tagFilters }: EntryTableProps) {
+  // Check if this status category is filtered to be hidden
+  const statusFilterKey: 'statusToProcess' | 'statusDone' | 'statusIgnored' = 
+    status === 'to_process' ? 'statusToProcess' :
+    status === 'processed' ? 'statusDone' : 'statusIgnored';
+  
+  if (tagFilters[statusFilterKey] === 'hidden') {
+    return null;
+  }
+  
   if (entries.length === 0) {
     return null;
   }
