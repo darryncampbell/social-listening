@@ -49,12 +49,15 @@ function deduplicateEntries(entries: RssEntry[]): RssEntry[] {
   return Array.from(urlMap.values());
 }
 
+const ONLY_SHOW_MENTIONS_STORAGE_KEY = 'social-listening-only-show-mentions';
+
 export default function Home() {
   const [entries, setEntries] = useState<RssEntry[]>([]);
   const [errors, setErrors] = useState<Array<{ feedTitle: string; error: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [tagFilters, setTagFilters] = useState<TagFilters>(DEFAULT_TAG_FILTERS);
+  const [onlyShowMentions, setOnlyShowMentions] = useState(false);
 
   // Load entries and tag filters from localStorage on mount
   useEffect(() => {
@@ -103,6 +106,12 @@ export default function Home() {
       }
     }
     
+    // Load "only show mentions" filter
+    const storedOnlyShowMentions = localStorage.getItem(ONLY_SHOW_MENTIONS_STORAGE_KEY);
+    if (storedOnlyShowMentions === 'true') {
+      setOnlyShowMentions(true);
+    }
+    
     setMounted(true);
   }, []);
 
@@ -114,6 +123,11 @@ export default function Home() {
   const handleTagFiltersChange = useCallback((filters: TagFilters) => {
     setTagFilters(filters);
     localStorage.setItem(TAG_FILTERS_STORAGE_KEY, JSON.stringify(filters));
+  }, []);
+
+  const handleOnlyShowMentionsChange = useCallback((enabled: boolean) => {
+    setOnlyShowMentions(enabled);
+    localStorage.setItem(ONLY_SHOW_MENTIONS_STORAGE_KEY, enabled ? 'true' : 'false');
   }, []);
 
   // Fetch OG data for entries that don't have it yet
@@ -201,8 +215,10 @@ export default function Home() {
         tagFilters={tagFilters}
         onTagFiltersChange={handleTagFiltersChange}
         entries={entries}
+        onlyShowMentions={onlyShowMentions}
+        onOnlyShowMentionsChange={handleOnlyShowMentionsChange}
       />
-      <FeedEntries entries={entries} errors={errors} loading={loading} tagFilters={tagFilters} />
+      <FeedEntries entries={entries} errors={errors} loading={loading} tagFilters={tagFilters} onlyShowMentions={onlyShowMentions} />
     </div>
   );
 }

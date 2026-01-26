@@ -112,6 +112,7 @@ interface FeedEntriesProps {
   errors: Array<{ feedTitle: string; error: string }>;
   loading: boolean;
   tagFilters: TagFilters;
+  onlyShowMentions: boolean;
 }
 
 interface CategorizedEntries {
@@ -372,7 +373,7 @@ function categorizeEntriesFromSource(entries: RssEntry[], crossPostDescriptions:
   };
 }
 
-export default function FeedEntries({ entries, errors, loading, tagFilters }: FeedEntriesProps) {
+export default function FeedEntries({ entries, errors, loading, tagFilters, onlyShowMentions }: FeedEntriesProps) {
   const [categorized, setCategorized] = useState<CategorizedEntries>({
     toProcess: [],
     processed: [],
@@ -477,6 +478,19 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
 
   // Apply tag filters to entries
   const filteredEntries = useMemo(() => {
+    const interestLower = interest.toLowerCase();
+    
+    // First, apply "only show mentions" filter if enabled
+    let entriesToFilter = entries;
+    if (onlyShowMentions) {
+      entriesToFilter = entries.filter(entry => {
+        const displayTitle = entry.og?.ogTitle || entry.title || '';
+        const displayDescription = entry.og?.ogDescription || entry.description || '';
+        return displayTitle.toLowerCase().includes(interestLower) || 
+               displayDescription.toLowerCase().includes(interestLower);
+      });
+    }
+    
     // Check if any static filters are hidden
     const hasStaticFilter = Object.entries(tagFilters)
       .filter(([key]) => key !== 'feeds')
@@ -485,12 +499,10 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
     // Check if any feed filters are hidden
     const hasFeedFilter = Object.values(tagFilters.feeds).some(v => v === 'hidden');
     
-    // If no filters are set to hidden, return all entries
-    if (!hasStaticFilter && !hasFeedFilter) return entries;
-
-    const interestLower = interest.toLowerCase();
+    // If no filters are set to hidden, return filtered entries
+    if (!hasStaticFilter && !hasFeedFilter) return entriesToFilter;
     
-    return entries.filter(entry => {
+    return entriesToFilter.filter(entry => {
       const displayTitle = entry.og?.ogTitle || entry.title || '';
       const displayDescription = entry.og?.ogDescription || entry.description || '';
       
@@ -528,7 +540,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters }: Fe
       
       return true;
     });
-  }, [entries, tagFilters, interest, crossPostDescriptions]);
+  }, [entries, tagFilters, interest, crossPostDescriptions, onlyShowMentions]);
 
   const recategorize = useCallback(() => {
     setCategorized(categorizeEntriesFromSource(filteredEntries, crossPostDescriptions));

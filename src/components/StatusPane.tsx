@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash, faChevronDown, faRss, faGlobe } from '@fortawesome/free-solid-svg-icons';
+import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash, faChevronDown, faRss, faGlobe, faBullhorn } from '@fortawesome/free-solid-svg-icons';
 import styles from './StatusPane.module.css';
 import PromptModal, { PromptType } from './PromptModal';
 import { fetchAndParseFeed, RssEntry } from '@/utils/rssParser';
@@ -29,9 +29,11 @@ interface StatusPaneProps {
   tagFilters: TagFilters;
   onTagFiltersChange: (filters: TagFilters) => void;
   entries: RssEntry[];
+  onlyShowMentions: boolean;
+  onOnlyShowMentionsChange: (enabled: boolean) => void;
 }
 
-export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, onTagFiltersChange, entries }: StatusPaneProps) {
+export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, onTagFiltersChange, entries, onlyShowMentions, onOnlyShowMentionsChange }: StatusPaneProps) {
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [externalSources, setExternalSources] = useState<ExternalSource[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
@@ -490,14 +492,14 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
             {filterOpen && (
               <div className={styles.filterDropdown}>
                 <div className={styles.filterHeader}>Filter by Content</div>
-                {(['comment', 'crossPost', 'deleted', 'mentionsInterest', 'github'] as ContentTagType[]).map((tag) => (
+                {(['comment', 'crossPost', 'deleted', 'github'] as ContentTagType[]).map((tag) => (
                   <button
                     key={tag}
                     className={`${styles.filterOption} ${tagFilters[tag] === 'hidden' ? styles.filterOptionHidden : ''}`}
                     onClick={() => handleTagFilterChange(tag)}
                   >
                     <span className={styles.filterOptionLabel}>
-                      {tag === 'mentionsInterest' ? `Mentions ${interest}` : CONTENT_TAG_LABELS[tag]}
+                      {CONTENT_TAG_LABELS[tag]}
                     </span>
                     <span className={`${styles.filterState} ${styles[`filterState_${tagFilters[tag]}`]}`}>
                       <FontAwesomeIcon icon={tagFilters[tag] === 'shown' ? faEye : faEyeSlash} />
@@ -547,6 +549,14 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
               </div>
             )}
           </div>
+          <button
+            className={`${styles.onlyShowMentionsButton} ${onlyShowMentions ? styles.onlyShowMentionsButtonActive : ''}`}
+            onClick={() => onOnlyShowMentionsChange(!onlyShowMentions)}
+            title={`${onlyShowMentions ? 'Show all entries' : `Only show entries mentioning ${interest}`}`}
+          >
+            <FontAwesomeIcon icon={faBullhorn} />
+            <span>Only show {interest}</span>
+          </button>
           <button
             className={styles.promptButton}
             onClick={() => setPromptModalType('article')}

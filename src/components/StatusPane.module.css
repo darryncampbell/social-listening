@@ -242,6 +242,39 @@
   color: var(--text-muted);
 }
 
+.onlyShowMentionsButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.8125rem;
+  font-family: inherit;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.onlyShowMentionsButton:hover {
+  background: var(--bg-button-hover);
+  border-color: var(--accent);
+}
+
+.onlyShowMentionsButtonActive {
+  background: rgba(0, 180, 216, 0.15);
+  border-color: #00b4d8;
+  color: #00b4d8;
+  font-weight: 600;
+}
+
+.onlyShowMentionsButtonActive:hover {
+  background: rgba(0, 180, 216, 0.25);
+  border-color: #00b4d8;
+}
+
 .promptButton {
   display: flex;
   align-items: center;
