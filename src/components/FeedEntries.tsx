@@ -881,6 +881,9 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, is
   if (isIndented) entryClassNames.push(styles.entryIndented);
   if (isDummyParent) entryClassNames.push(styles.entryDummyParent);
   
+  // Highlight entries that mention the interest
+  if (mentionsInterest) entryClassNames.push(styles.entryMentionsInterest);
+  
   // Check if this entry should be highlighted as a cross-post
   const entryDescription = (displayDescription || '').trim().toLowerCase();
   const isHighlightedCrossPost = highlightedCrossPost !== null && entryDescription === highlightedCrossPost;

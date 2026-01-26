@@ -93,9 +93,22 @@
   opacity: 0.85;
 }
 
+.entryMentionsInterest {
+  border: 2px solid #00b4d8;
+  background: rgba(0, 180, 216, 0.08);
+  box-shadow: 0 0 12px rgba(0, 180, 216, 0.2);
+}
+
 .entryCrossPostHighlight {
   border: 2px solid #8b5cf6;
   box-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
+}
+
+/* Cross-post highlight should override interest mention highlight when both are present */
+.entryMentionsInterest.entryCrossPostHighlight {
+  border: 2px solid #8b5cf6;
+  background: rgba(139, 92, 246, 0.12);
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
 }
 
 .entryHeader {
