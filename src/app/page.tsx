@@ -50,6 +50,7 @@ function deduplicateEntries(entries: RssEntry[]): RssEntry[] {
 }
 
 const ONLY_SHOW_MENTIONS_STORAGE_KEY = 'social-listening-only-show-mentions';
+const ONLY_SHOW_STARRED_STORAGE_KEY = 'social-listening-only-show-starred';
 
 export default function Home() {
   const [entries, setEntries] = useState<RssEntry[]>([]);
@@ -58,6 +59,7 @@ export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [tagFilters, setTagFilters] = useState<TagFilters>(DEFAULT_TAG_FILTERS);
   const [onlyShowMentions, setOnlyShowMentions] = useState(false);
+  const [onlyShowStarred, setOnlyShowStarred] = useState(false);
 
   // Load entries and tag filters from localStorage on mount
   useEffect(() => {
@@ -112,6 +114,12 @@ export default function Home() {
       setOnlyShowMentions(true);
     }
     
+    // Load "only show starred" filter
+    const storedOnlyShowStarred = localStorage.getItem(ONLY_SHOW_STARRED_STORAGE_KEY);
+    if (storedOnlyShowStarred === 'true') {
+      setOnlyShowStarred(true);
+    }
+    
     setMounted(true);
   }, []);
 
@@ -128,6 +136,11 @@ export default function Home() {
   const handleOnlyShowMentionsChange = useCallback((enabled: boolean) => {
     setOnlyShowMentions(enabled);
     localStorage.setItem(ONLY_SHOW_MENTIONS_STORAGE_KEY, enabled ? 'true' : 'false');
+  }, []);
+
+  const handleOnlyShowStarredChange = useCallback((enabled: boolean) => {
+    setOnlyShowStarred(enabled);
+    localStorage.setItem(ONLY_SHOW_STARRED_STORAGE_KEY, enabled ? 'true' : 'false');
   }, []);
 
   // Fetch OG data for entries that don't have it yet
@@ -217,8 +230,10 @@ export default function Home() {
         entries={entries}
         onlyShowMentions={onlyShowMentions}
         onOnlyShowMentionsChange={handleOnlyShowMentionsChange}
+        onlyShowStarred={onlyShowStarred}
+        onOnlyShowStarredChange={handleOnlyShowStarredChange}
       />
-      <FeedEntries entries={entries} errors={errors} loading={loading} tagFilters={tagFilters} onlyShowMentions={onlyShowMentions} />
+      <FeedEntries entries={entries} errors={errors} loading={loading} tagFilters={tagFilters} onlyShowMentions={onlyShowMentions} onlyShowStarred={onlyShowStarred} />
     </div>
   );
 }

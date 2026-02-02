@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck, faBan, faUndo, faExternalLinkAlt, faChevronDown, faChevronUp, faSpinner, faWandMagicSparkles, faRedo, faLink, faComment, faCodeBranch, faTrash, faBullhorn, faExclamationTriangle, faCrown } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faBan, faUndo, faExternalLinkAlt, faChevronDown, faChevronUp, faSpinner, faWandMagicSparkles, faRedo, faLink, faComment, faCodeBranch, faTrash, faBullhorn, faExclamationTriangle, faCrown, faStar } from '@fortawesome/free-solid-svg-icons';
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
 import { RssEntry } from '@/utils/rssParser';
 import {
@@ -21,6 +21,7 @@ import {
   isRedditUrl,
   getUncachedUrls,
 } from '@/utils/redditAuthorCache';
+import { getStarredEntryIds, toggleStarred } from '@/utils/starredStorage';
 import styles from './FeedEntries.module.css';
 
 /**
@@ -113,6 +114,7 @@ interface FeedEntriesProps {
   loading: boolean;
   tagFilters: TagFilters;
   onlyShowMentions: boolean;
+  onlyShowStarred: boolean;
 }
 
 interface CategorizedEntries {
@@ -373,13 +375,14 @@ function categorizeEntriesFromSource(entries: RssEntry[], crossPostDescriptions:
   };
 }
 
-export default function FeedEntries({ entries, errors, loading, tagFilters, onlyShowMentions }: FeedEntriesProps) {
+export default function FeedEntries({ entries, errors, loading, tagFilters, onlyShowMentions, onlyShowStarred }: FeedEntriesProps) {
   const [categorized, setCategorized] = useState<CategorizedEntries>({
     toProcess: [],
     processed: [],
     ignored: [],
   });
   const [interest, setInterest] = useState('Darryn Campbell');
+  const [starredIds, setStarredIds] = useState<Set<string>>(new Set());
   // Track which cross-post description is currently highlighted (null = none)
   const [highlightedCrossPost, setHighlightedCrossPost] = useState<string | null>(null);
   // Store Reddit authors keyed by URL
@@ -387,7 +390,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
   // Store recognized users list
   const [recognizedUsers, setRecognizedUsers] = useState<RecognizedUser[]>([]);
 
-  // Load interest configuration on mount
+  // Load interest configuration and starred IDs on mount
   useEffect(() => {
     fetchEnvConfig().then(() => {
       setInterest(getInterest());
@@ -396,6 +399,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
       const customUsers = getRecognizedUsers();
       setRecognizedUsers([...predefinedUsers, ...customUsers]);
     });
+    setStarredIds(getStarredEntryIds());
   }, []);
 
   // Fetch Reddit authors asynchronously after entries are loaded
@@ -476,6 +480,11 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
   // Compute cross-post descriptions across all entries
   const crossPostDescriptions = useMemo(() => findCrossPostDescriptions(entries), [entries]);
 
+  const handleStarToggle = useCallback((entryId: string) => {
+    toggleStarred(entryId);
+    setStarredIds(getStarredEntryIds());
+  }, []);
+
   // Apply tag filters to entries
   const filteredEntries = useMemo(() => {
     const interestLower = interest.toLowerCase();
@@ -489,6 +498,11 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
         return displayTitle.toLowerCase().includes(interestLower) || 
                displayDescription.toLowerCase().includes(interestLower);
       });
+    }
+    
+    // Then, apply "only show starred" filter if enabled
+    if (onlyShowStarred) {
+      entriesToFilter = entriesToFilter.filter(entry => starredIds.has(entry.id));
     }
     
     // Check if any static filters are hidden
@@ -540,7 +554,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
       
       return true;
     });
-  }, [entries, tagFilters, interest, crossPostDescriptions, onlyShowMentions]);
+  }, [entries, tagFilters, interest, crossPostDescriptions, onlyShowMentions, onlyShowStarred, starredIds]);
 
   const recategorize = useCallback(() => {
     setCategorized(categorizeEntriesFromSource(filteredEntries, crossPostDescriptions));
@@ -597,6 +611,8 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
         entries={categorized.toProcess}
         status="to_process"
         onAction={handleAction}
+        onStarToggle={handleStarToggle}
+        starredIds={starredIds}
         crossPostDescriptions={crossPostDescriptions}
         interest={interest}
         highlightedCrossPost={highlightedCrossPost}
@@ -612,6 +628,8 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
         entries={categorized.processed}
         status="processed"
         onAction={handleAction}
+        onStarToggle={handleStarToggle}
+        starredIds={starredIds}
         crossPostDescriptions={crossPostDescriptions}
         interest={interest}
         highlightedCrossPost={highlightedCrossPost}
@@ -627,6 +645,8 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
         entries={categorized.ignored}
         status="ignored"
         onAction={handleAction}
+        onStarToggle={handleStarToggle}
+        starredIds={starredIds}
         crossPostDescriptions={crossPostDescriptions}
         interest={interest}
         highlightedCrossPost={highlightedCrossPost}
@@ -645,6 +665,8 @@ interface EntryTableProps {
   entries: EntryWithThread[];
   status: EntryStatus;
   onAction: (entryId: string, action: 'process' | 'ignore' | 'restore') => void;
+  onStarToggle: (entryId: string) => void;
+  starredIds: Set<string>;
   crossPostDescriptions: Set<string>;
   interest: string;
   highlightedCrossPost: string | null;
@@ -654,7 +676,7 @@ interface EntryTableProps {
   tagFilters: TagFilters;
 }
 
-function EntryTable({ id, title, entries, status, onAction, crossPostDescriptions, interest, highlightedCrossPost, onCrossPostClick, redditAuthors, recognizedUsers, tagFilters }: EntryTableProps) {
+function EntryTable({ id, title, entries, status, onAction, onStarToggle, starredIds, crossPostDescriptions, interest, highlightedCrossPost, onCrossPostClick, redditAuthors, recognizedUsers, tagFilters }: EntryTableProps) {
   // Check if this status category is filtered to be hidden
   const statusFilterKey: 'statusToProcess' | 'statusDone' | 'statusIgnored' = 
     status === 'to_process' ? 'statusToProcess' :
@@ -680,6 +702,8 @@ function EntryTable({ id, title, entries, status, onAction, crossPostDescription
             entry={entry}
             status={status}
             onAction={onAction}
+            onStarToggle={onStarToggle}
+            isStarred={starredIds.has(entry.id)}
             crossPostDescriptions={crossPostDescriptions}
             interest={interest}
             isIndented={entry.isCommentThread}
@@ -699,6 +723,8 @@ interface EntryRowProps {
   entry: EntryWithThread;
   status: EntryStatus;
   onAction: (entryId: string, action: 'process' | 'ignore' | 'restore') => void;
+  onStarToggle: (entryId: string) => void;
+  isStarred: boolean;
   crossPostDescriptions: Set<string>;
   interest: string;
   isIndented?: boolean;
@@ -725,7 +751,7 @@ function isUserRecognized(username: string, recognizedUsers: RecognizedUser[]): 
   return findUserRecognized(username, recognizedUsers) !== null;
 }
 
-function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, isIndented, isDummyParent, highlightedCrossPost, onCrossPostClick, redditAuthor, recognizedUsers }: EntryRowProps) {
+function EntryRow({ entry, status, onAction, onStarToggle, isStarred, crossPostDescriptions, interest, isIndented, isDummyParent, highlightedCrossPost, onCrossPostClick, redditAuthor, recognizedUsers }: EntryRowProps) {
   const [showRawDetails, setShowRawDetails] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | undefined>(undefined);
   const [generating, setGenerating] = useState(false);
@@ -951,6 +977,15 @@ function EntryRow({ entry, status, onAction, crossPostDescriptions, interest, is
           )}
         </div>
         <div className={styles.entryActions}>
+          {!isDummyParent && (
+            <button
+              className={`${styles.starBtn} ${isStarred ? styles.starBtnActive : ''}`}
+              onClick={() => onStarToggle(entry.id)}
+              title={isStarred ? 'Unstar' : 'Star'}
+            >
+              <FontAwesomeIcon icon={faStar} />
+            </button>
+          )}
           {status === 'to_process' && !isDummyParent && (
             <>
               <button

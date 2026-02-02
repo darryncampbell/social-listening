@@ -203,7 +203,36 @@
 
 .entryActions {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
+}
+
+.starBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+}
+
+.starBtn:hover {
+  background: var(--bg-button-hover);
+  color: var(--text-secondary);
+}
+
+.starBtnActive {
+  color: #eab308;
+}
+
+.starBtnActive:hover {
+  color: #ca9a04;
 }
 
 .actionBtn {

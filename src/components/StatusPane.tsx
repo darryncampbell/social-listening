@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash, faChevronDown, faRss, faGlobe, faBullhorn, faBan } from '@fortawesome/free-solid-svg-icons';
+import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash, faChevronDown, faRss, faGlobe, faBullhorn, faBan, faStar } from '@fortawesome/free-solid-svg-icons';
 import styles from './StatusPane.module.css';
 import PromptModal, { PromptType } from './PromptModal';
 import ConfirmModal from './ConfirmModal';
@@ -33,9 +33,11 @@ interface StatusPaneProps {
   entries: RssEntry[];
   onlyShowMentions: boolean;
   onOnlyShowMentionsChange: (enabled: boolean) => void;
+  onlyShowStarred: boolean;
+  onOnlyShowStarredChange: (enabled: boolean) => void;
 }
 
-export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, onTagFiltersChange, entries, onlyShowMentions, onOnlyShowMentionsChange }: StatusPaneProps) {
+export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, onTagFiltersChange, entries, onlyShowMentions, onOnlyShowMentionsChange, onlyShowStarred, onOnlyShowStarredChange }: StatusPaneProps) {
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [externalSources, setExternalSources] = useState<ExternalSource[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
@@ -559,6 +561,14 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
           >
             <FontAwesomeIcon icon={faBullhorn} />
             <span>Only show {interest}</span>
+          </button>
+          <button
+            className={`${styles.onlyShowStarredButton} ${onlyShowStarred ? styles.onlyShowStarredButtonActive : ''}`}
+            onClick={() => onOnlyShowStarredChange(!onlyShowStarred)}
+            title={onlyShowStarred ? 'Show all entries' : 'Only show starred items'}
+          >
+            <FontAwesomeIcon icon={faStar} />
+            <span>Only show starred</span>
           </button>
           <button
             className={styles.ignoreAllButton}

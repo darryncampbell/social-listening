@@ -275,6 +275,39 @@
   border-color: #00b4d8;
 }
 
+.onlyShowStarredButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.8125rem;
+  font-family: inherit;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.onlyShowStarredButton:hover {
+  background: var(--bg-button-hover);
+  border-color: var(--accent);
+}
+
+.onlyShowStarredButtonActive {
+  background: rgba(234, 179, 8, 0.15);
+  border-color: #eab308;
+  color: #eab308;
+  font-weight: 600;
+}
+
+.onlyShowStarredButtonActive:hover {
+  background: rgba(234, 179, 8, 0.25);
+  border-color: #eab308;
+}
+
 .ignoreAllButton {
   display: flex;
   align-items: center;
