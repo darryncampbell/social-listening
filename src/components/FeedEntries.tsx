@@ -424,7 +424,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
     
     // Update state with cached authors
     if (cachedAuthors.size > 0) {
-      setRedditAuthors(prev => new Map([...prev, ...cachedAuthors]));
+      setRedditAuthors(prev => new Map([...prev.entries(), ...cachedAuthors.entries()]));
     }
 
     // Find URLs that need to be fetched
@@ -450,17 +450,26 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
           if (response.ok) {
             const data = await response.json();
             if (data.author) {
-              // Cache the result
               setCachedAuthor(url, data.author);
-              // Update state
-              setRedditAuthors(prev => new Map([...prev, [url, data.author]]));
+              setRedditAuthors(prev => new Map([...prev.entries(), [url, data.author]]));
+            } else {
+              // Cache failure so we don't retry on load; only Refetch button will retry
+              setCachedAuthor(url, 'Unknown');
+              setRedditAuthors(prev => new Map([...prev.entries(), [url, "Unknown"]]));
             }
+          } else {
+            // Cache failure so we don't retry on load; only Refetch button will retry
+            setCachedAuthor(url, 'Unknown');
+            setRedditAuthors(prev => new Map([...prev.entries(), [url, "Unknown"]]));
           }
           
           // 1 second delay between requests (Reddit OAuth allows 60 req/min)
           await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (error) {
           console.error('Error fetching Reddit author for', url, error);
+          // Cache failure so we don't retry on load; only Refetch button will retry
+          setCachedAuthor(url, 'Unknown');
+          setRedditAuthors(prev => new Map([...prev.entries(), [url, "Unknown"]]));
         }
       }
     };
@@ -499,7 +508,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
             const data = await response.json();
             if (data.author) {
               setCachedAuthor(url, data.author);
-              setRedditAuthors(prev => new Map([...prev, [url, data.author]]));
+              setRedditAuthors(prev => new Map([...prev.entries(), [url, data.author]]));
             }
           }
           await new Promise(resolve => setTimeout(resolve, 1000));
