@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash, faChevronDown, faRss, faGlobe, faBullhorn, faBan, faStar } from '@fortawesome/free-solid-svg-icons';
+import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash, faChevronDown, faChevronRight, faRss, faGlobe, faBullhorn, faBan, faStar, faCircleMinus } from '@fortawesome/free-solid-svg-icons';
 import styles from './StatusPane.module.css';
-import PromptModal, { PromptType } from './PromptModal';
+import PromptModal from './PromptModal';
 import ConfirmModal from './ConfirmModal';
 import { fetchAndParseFeed, RssEntry } from '@/utils/rssParser';
 import { TagFilters, TagType, ContentTagType, StatusTagType, CONTENT_TAG_LABELS, STATUS_TAG_LABELS, toggleFilterState, getFeedFilterState } from '@/utils/tagFilter';
@@ -12,7 +12,8 @@ import { getInterest, fetchEnvConfig, getPredefinedFeeds, getPredefinedExternalS
 import { getExternalSources, ExternalSource } from '@/utils/externalSourcesConfig';
 import { SkoolPost, StackOverflowPost } from '@/app/api/scrape/route';
 import { loadEntries } from '@/utils/entryStorage';
-import { markAsIgnored, getEntryStatus } from '@/utils/entryState';
+import { markAsIgnored } from '@/utils/entryState';
+import { getStarredEntryIds, clearAllStarred } from '@/utils/starredStorage';
 
 const FEEDS_STORAGE_KEY = 'social-listening-feeds';
 const SYNC_TIME_STORAGE_KEY = 'social-listening-last-sync';
@@ -35,24 +36,30 @@ interface StatusPaneProps {
   onOnlyShowMentionsChange: (enabled: boolean) => void;
   onlyShowStarred: boolean;
   onOnlyShowStarredChange: (enabled: boolean) => void;
+  /** IDs of entries currently shown in the "To Process" section (same as section count). */
+  visibleToProcessIds: string[];
 }
 
-export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, onTagFiltersChange, entries, onlyShowMentions, onOnlyShowMentionsChange, onlyShowStarred, onOnlyShowStarredChange }: StatusPaneProps) {
+export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, onTagFiltersChange, entries, onlyShowMentions, onOnlyShowMentionsChange, onlyShowStarred, onOnlyShowStarredChange, visibleToProcessIds }: StatusPaneProps) {
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [externalSources, setExternalSources] = useState<ExternalSource[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [lastSyncDate, setLastSyncDate] = useState<Date | null>(null);
   const [isSyncStale, setIsSyncStale] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [promptModalType, setPromptModalType] = useState<PromptType | null>(null);
+  const [showPromptsModal, setShowPromptsModal] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<{ current: number; total: number; currentName: string } | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [filterAdvancedOpen, setFilterAdvancedOpen] = useState(false);
   const [syncDropdownOpen, setSyncDropdownOpen] = useState(false);
+  const [actionsDropdownOpen, setActionsDropdownOpen] = useState(false);
   const [interest, setInterest] = useState('');
   const [showIgnoreAllModal, setShowIgnoreAllModal] = useState(false);
+  const [showUnstarAllModal, setShowUnstarAllModal] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
   const syncRef = useRef<HTMLDivElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
 
   // Extract unique feed titles from entries
   const uniqueFeedTitles = useMemo(() => {
@@ -141,6 +148,9 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
       }
       if (syncRef.current && !syncRef.current.contains(event.target as Node)) {
         setSyncDropdownOpen(false);
+      }
+      if (actionsRef.current && !actionsRef.current.contains(event.target as Node)) {
+        setActionsDropdownOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -484,57 +494,47 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
           </div>
           <div className={styles.filterWrapper} ref={filterRef}>
             <button
-              className={`${styles.filterButton} ${activeFilterCount > 0 ? styles.filterActive : ''}`}
+              className={`${styles.filterButton} ${(activeFilterCount > 0 || onlyShowMentions || onlyShowStarred) ? styles.filterActive : ''}`}
               onClick={() => setFilterOpen(!filterOpen)}
               title="Filter by tags"
             >
               <FontAwesomeIcon icon={faFilter} />
               <span>Filter</span>
-              {activeFilterCount > 0 && (
-                <span className={styles.filterBadge}>{activeFilterCount}</span>
+              {(activeFilterCount > 0 || onlyShowMentions || onlyShowStarred) && (
+                <span className={styles.filterBadge}>
+                  {activeFilterCount + (onlyShowMentions ? 1 : 0) + (onlyShowStarred ? 1 : 0)}
+                </span>
               )}
             </button>
             {filterOpen && (
               <div className={styles.filterDropdown}>
-                <div className={styles.filterHeader}>Filter by Content</div>
-                {(['comment', 'crossPost', 'deleted', 'github'] as ContentTagType[]).map((tag) => (
-                  <button
-                    key={tag}
-                    className={`${styles.filterOption} ${tagFilters[tag] === 'hidden' ? styles.filterOptionHidden : ''}`}
-                    onClick={() => handleTagFilterChange(tag)}
-                  >
-                    <span className={styles.filterOptionLabel}>
-                      {CONTENT_TAG_LABELS[tag]}
-                    </span>
-                    <span className={`${styles.filterState} ${styles[`filterState_${tagFilters[tag]}`]}`}>
-                      <FontAwesomeIcon icon={tagFilters[tag] === 'shown' ? faEye : faEyeSlash} />
-                      <span>{tagFilters[tag] === 'shown' ? 'Shown' : 'Hidden'}</span>
-                    </span>
-                  </button>
-                ))}
-                {uniqueFeedTitles.length > 0 && (
-                  <>
-                    <div className={styles.filterHeader}>Filter by Feed</div>
-                    {uniqueFeedTitles.map((feedTitle) => {
-                      const feedState = getFeedFilterState(tagFilters, feedTitle);
-                      return (
-                        <button
-                          key={feedTitle}
-                          className={`${styles.filterOption} ${feedState === 'hidden' ? styles.filterOptionHidden : ''}`}
-                          onClick={() => handleFeedFilterChange(feedTitle)}
-                        >
-                          <span className={styles.filterOptionLabel}>
-                            {feedTitle}
-                          </span>
-                          <span className={`${styles.filterState} ${styles[`filterState_${feedState}`]}`}>
-                            <FontAwesomeIcon icon={feedState === 'shown' ? faEye : faEyeSlash} />
-                            <span>{feedState === 'shown' ? 'Shown' : 'Hidden'}</span>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </>
-                )}
+                <div className={styles.filterHeader}>Show only</div>
+                <button
+                  type="button"
+                  className={`${styles.filterOption} ${onlyShowMentions ? styles.filterOptionActive : ''}`}
+                  onClick={() => onOnlyShowMentionsChange(!onlyShowMentions)}
+                >
+                  <span className={styles.filterOptionLabel}>
+                    <FontAwesomeIcon icon={faBullhorn} className={styles.filterOptionIcon} />
+                    Only show {interest}
+                  </span>
+                  <span className={`${styles.filterState} ${onlyShowMentions ? styles.filterStateOn : styles.filterStateOff}`}>
+                    {onlyShowMentions ? 'On' : 'Off'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.filterOption} ${onlyShowStarred ? styles.filterOptionActive : ''}`}
+                  onClick={() => onOnlyShowStarredChange(!onlyShowStarred)}
+                >
+                  <span className={styles.filterOptionLabel}>
+                    <FontAwesomeIcon icon={faStar} className={styles.filterOptionIcon} />
+                    Only show starred
+                  </span>
+                  <span className={`${styles.filterState} ${onlyShowStarred ? styles.filterStateOn : styles.filterStateOff}`}>
+                    {onlyShowStarred ? 'On' : 'Off'}
+                  </span>
+                </button>
                 <div className={styles.filterHeader}>Filter by Status</div>
                 {(['statusToProcess', 'statusDone', 'statusIgnored'] as StatusTagType[]).map((tag) => (
                   <button
@@ -551,44 +551,103 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
                     </span>
                   </button>
                 ))}
+                <button
+                  type="button"
+                  className={styles.filterAdvancedToggle}
+                  onClick={() => setFilterAdvancedOpen(!filterAdvancedOpen)}
+                  aria-expanded={filterAdvancedOpen}
+                >
+                  <FontAwesomeIcon icon={filterAdvancedOpen ? faChevronDown : faChevronRight} className={styles.filterAdvancedChevron} />
+                  <span className={styles.filterAdvancedToggleLabel}>Advanced</span>
+                </button>
+                {filterAdvancedOpen && (
+                  <>
+                    <div className={styles.filterHeader}>Filter by Content</div>
+                    {(['comment', 'crossPost', 'deleted', 'github'] as ContentTagType[]).map((tag) => (
+                      <button
+                        key={tag}
+                        className={`${styles.filterOption} ${tagFilters[tag] === 'hidden' ? styles.filterOptionHidden : ''}`}
+                        onClick={() => handleTagFilterChange(tag)}
+                      >
+                        <span className={styles.filterOptionLabel}>
+                          {CONTENT_TAG_LABELS[tag]}
+                        </span>
+                        <span className={`${styles.filterState} ${styles[`filterState_${tagFilters[tag]}`]}`}>
+                          <FontAwesomeIcon icon={tagFilters[tag] === 'shown' ? faEye : faEyeSlash} />
+                          <span>{tagFilters[tag] === 'shown' ? 'Shown' : 'Hidden'}</span>
+                        </span>
+                      </button>
+                    ))}
+                    {uniqueFeedTitles.length > 0 && (
+                      <>
+                        <div className={styles.filterHeader}>Filter by Feed</div>
+                        {uniqueFeedTitles.map((feedTitle) => {
+                          const feedState = getFeedFilterState(tagFilters, feedTitle);
+                          return (
+                            <button
+                              key={feedTitle}
+                              className={`${styles.filterOption} ${feedState === 'hidden' ? styles.filterOptionHidden : ''}`}
+                              onClick={() => handleFeedFilterChange(feedTitle)}
+                            >
+                              <span className={styles.filterOptionLabel}>
+                                {feedTitle}
+                              </span>
+                              <span className={`${styles.filterState} ${styles[`filterState_${feedState}`]}`}>
+                                <FontAwesomeIcon icon={feedState === 'shown' ? faEye : faEyeSlash} />
+                                <span>{feedState === 'shown' ? 'Shown' : 'Hidden'}</span>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          <div className={styles.actionsWrapper} ref={actionsRef}>
+            <button
+              type="button"
+              className={styles.actionsButton}
+              onClick={() => setActionsDropdownOpen(!actionsDropdownOpen)}
+              title="Actions"
+            >
+              <span>Actions</span>
+              <FontAwesomeIcon icon={faChevronDown} className={styles.actionsChevron} />
+            </button>
+            {actionsDropdownOpen && (
+              <div className={styles.actionsDropdown}>
+                <button
+                  type="button"
+                  className={styles.actionsOption}
+                  onClick={() => {
+                    setActionsDropdownOpen(false);
+                    setShowIgnoreAllModal(true);
+                  }}
+                >
+                  <FontAwesomeIcon icon={faBan} />
+                  <span>Ignore All</span>
+                </button>
+                <button
+                  type="button"
+                  className={styles.actionsOption}
+                  onClick={() => {
+                    setActionsDropdownOpen(false);
+                    setShowUnstarAllModal(true);
+                  }}
+                >
+                  <FontAwesomeIcon icon={faCircleMinus} />
+                  <span>Unstar all</span>
+                </button>
               </div>
             )}
           </div>
           <button
-            className={`${styles.onlyShowMentionsButton} ${onlyShowMentions ? styles.onlyShowMentionsButtonActive : ''}`}
-            onClick={() => onOnlyShowMentionsChange(!onlyShowMentions)}
-            title={`${onlyShowMentions ? 'Show all entries' : `Only show entries mentioning ${interest}`}`}
-          >
-            <FontAwesomeIcon icon={faBullhorn} />
-            <span>Only show {interest}</span>
-          </button>
-          <button
-            className={`${styles.onlyShowStarredButton} ${onlyShowStarred ? styles.onlyShowStarredButtonActive : ''}`}
-            onClick={() => onOnlyShowStarredChange(!onlyShowStarred)}
-            title={onlyShowStarred ? 'Show all entries' : 'Only show starred items'}
-          >
-            <FontAwesomeIcon icon={faStar} />
-            <span>Only show starred</span>
-          </button>
-          <button
-            className={styles.ignoreAllButton}
-            onClick={() => setShowIgnoreAllModal(true)}
-            title="Mark all 'To Process' items as ignored"
-          >
-            <FontAwesomeIcon icon={faBan} />
-            <span>Ignore All</span>
-          </button>
-          <button
             className={styles.promptButton}
-            onClick={() => setPromptModalType('article')}
+            onClick={() => setShowPromptsModal(true)}
           >
-            Article Response Prompt
-          </button>
-          <button
-            className={styles.promptButton}
-            onClick={() => setPromptModalType('comment')}
-          >
-            Comment Response Prompt
+            Prompts
           </button>
         </div>
       </div>
@@ -612,33 +671,36 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
           </div>
         </div>
       )}
-      {promptModalType && (
-        <PromptModal
-          type={promptModalType}
-          onClose={() => setPromptModalType(null)}
+      {showPromptsModal && (
+        <PromptModal onClose={() => setShowPromptsModal(false)} />
+      )}
+      {showIgnoreAllModal && (
+        <ConfirmModal
+          title="Ignore All Items"
+          message={`Are you sure you want to mark all ${visibleToProcessIds.length} 'To Process' items as ignored? This action cannot be undone.`}
+          onConfirm={() => {
+            visibleToProcessIds.forEach((id) => markAsIgnored(id));
+            setShowIgnoreAllModal(false);
+            window.location.reload();
+          }}
+          onCancel={() => setShowIgnoreAllModal(false)}
+          confirmText="Ignore All"
+          cancelText="Cancel"
         />
       )}
-      {showIgnoreAllModal && (() => {
-        // Load all entries from localStorage to get accurate count (not filtered)
-        const allEntries = loadEntries();
-        const toProcessCount = allEntries.filter(e => getEntryStatus(e.id) === 'to_process').length;
-        
+      {showUnstarAllModal && (() => {
+        const starredCount = getStarredEntryIds().size;
         return (
           <ConfirmModal
-            title="Ignore All Items"
-            message={`Are you sure you want to mark all ${toProcessCount} 'To Process' items as ignored? This action cannot be undone.`}
+            title="Unstar all items"
+            message={`Are you sure you want to remove the starred status from all ${starredCount} starred item${starredCount === 1 ? '' : 's'}? This action cannot be undone.`}
             onConfirm={() => {
-              // Mark all to_process entries as ignored (using all entries, not filtered)
-              const toProcessEntries = allEntries.filter(e => getEntryStatus(e.id) === 'to_process');
-              toProcessEntries.forEach(entry => {
-                markAsIgnored(entry.id);
-              });
-              setShowIgnoreAllModal(false);
-              // Trigger a page refresh to update the UI
+              clearAllStarred();
+              setShowUnstarAllModal(false);
               window.location.reload();
             }}
-            onCancel={() => setShowIgnoreAllModal(false)}
-            confirmText="Ignore All"
+            onCancel={() => setShowUnstarAllModal(false)}
+            confirmText="Unstar all"
             cancelText="Cancel"
           />
         );

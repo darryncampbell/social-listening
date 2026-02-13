@@ -50,3 +50,11 @@ export function setStarred(entryId: string, starred: boolean): void {
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(ids)));
 }
+
+/**
+ * Remove starred status from all entries
+ */
+export function clearAllStarred(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+}

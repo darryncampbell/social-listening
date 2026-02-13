@@ -355,6 +355,78 @@
   transform: scale(0.98);
 }
 
+.actionsWrapper {
+  position: relative;
+}
+
+.actionsButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.actionsButton:hover {
+  background: var(--bg-button-hover);
+  color: var(--text-primary);
+}
+
+.actionsChevron {
+  font-size: 0.625rem;
+  opacity: 0.8;
+}
+
+.actionsDropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 180px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.actionsOption {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.1s ease;
+  text-align: left;
+}
+
+.actionsOption:hover {
+  background: var(--bg-button-hover);
+}
+
+.actionsOption:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+.actionsOption svg {
+  width: 14px;
+  color: var(--text-muted);
+}
+
 .filterWrapper {
   position: relative;
 }
@@ -478,4 +550,61 @@
 
 .filterOptionHidden {
   opacity: 0.7;
+}
+
+.filterAdvancedToggle {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  border: none;
+  border-top: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+  text-align: left;
+  margin-top: 0.25rem;
+}
+
+.filterAdvancedToggle:hover {
+  background: var(--bg-button-hover);
+  color: var(--text-primary);
+}
+
+.filterAdvancedChevron {
+  width: 12px;
+  margin-right: 0.5rem;
+  transition: transform 0.15s ease;
+}
+
+.filterAdvancedToggleLabel {
+  flex: 1;
+}
+
+.filterOptionIcon {
+  margin-right: 0.5rem;
+  color: var(--text-muted);
+  width: 14px;
+}
+
+.filterOptionActive {
+  background: rgba(0, 180, 216, 0.08);
+}
+
+.filterOptionActive .filterStateOn {
+  color: var(--accent);
+}
+
+.filterStateOn {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.filterStateOff {
+  color: var(--text-muted);
 }

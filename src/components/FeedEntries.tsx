@@ -115,6 +115,8 @@ interface FeedEntriesProps {
   tagFilters: TagFilters;
   onlyShowMentions: boolean;
   onlyShowStarred: boolean;
+  /** Called when the list of entry IDs shown in "To Process" changes (for Ignore All modal count). */
+  onToProcessIdsChange?: (ids: string[]) => void;
 }
 
 interface CategorizedEntries {
@@ -375,7 +377,7 @@ function categorizeEntriesFromSource(entries: RssEntry[], crossPostDescriptions:
   };
 }
 
-export default function FeedEntries({ entries, errors, loading, tagFilters, onlyShowMentions, onlyShowStarred }: FeedEntriesProps) {
+export default function FeedEntries({ entries, errors, loading, tagFilters, onlyShowMentions, onlyShowStarred, onToProcessIdsChange }: FeedEntriesProps) {
   const [categorized, setCategorized] = useState<CategorizedEntries>({
     toProcess: [],
     processed: [],
@@ -563,6 +565,11 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
   useEffect(() => {
     recategorize();
   }, [recategorize]);
+
+  // Keep parent in sync with visible "To Process" IDs (for Ignore All modal count).
+  useEffect(() => {
+    onToProcessIdsChange?.(categorized.toProcess.map((e) => e.id));
+  }, [categorized, onToProcessIdsChange]);
 
   const handleAction = (entryId: string, action: 'process' | 'ignore' | 'restore') => {
     switch (action) {

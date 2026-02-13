@@ -14,11 +14,17 @@ import styles from './PromptModal.module.css';
 export type PromptType = 'article' | 'comment';
 
 interface PromptModalProps {
-  type: PromptType;
   onClose: () => void;
 }
 
-const config = {
+const config: Record<PromptType, {
+  title: string;
+  description: string;
+  placeholder: string;
+  storageKey: string;
+  defaultPrompt: string;
+  save: (value: string) => void;
+}> = {
   article: {
     title: 'Article Response Prompt',
     description: 'Set the default prompt used for generating AI responses to articles.',
@@ -37,12 +43,14 @@ const config = {
   },
 };
 
-export default function PromptModal({ type, onClose }: PromptModalProps) {
+export default function PromptModal({ onClose }: PromptModalProps) {
+  const [activeTab, setActiveTab] = useState<PromptType>('article');
   const [prompt, setPrompt] = useState('');
   const [saved, setSaved] = useState(false);
 
-  const cfg = config[type];
+  const cfg = config[activeTab];
 
+  // Load prompt for the active tab when tab or modal opens
   useEffect(() => {
     const stored = localStorage.getItem(cfg.storageKey);
     if (stored) {
@@ -50,7 +58,8 @@ export default function PromptModal({ type, onClose }: PromptModalProps) {
     } else {
       setPrompt(cfg.defaultPrompt);
     }
-  }, [cfg.storageKey, cfg.defaultPrompt]);
+    setSaved(false);
+  }, [activeTab, cfg.storageKey, cfg.defaultPrompt]);
 
   const handleSave = () => {
     cfg.save(prompt);
@@ -63,7 +72,23 @@ export default function PromptModal({ type, onClose }: PromptModalProps) {
   return (
     <div className={styles.overlay}>
       <div className={styles.modal}>
-        <h3 className={styles.title}>{cfg.title}</h3>
+        <h3 className={styles.title}>Prompts</h3>
+        <div className={styles.tabs}>
+          <button
+            type="button"
+            className={`${styles.tab} ${activeTab === 'article' ? styles.tabActive : ''}`}
+            onClick={() => setActiveTab('article')}
+          >
+            Article response
+          </button>
+          <button
+            type="button"
+            className={`${styles.tab} ${activeTab === 'comment' ? styles.tabActive : ''}`}
+            onClick={() => setActiveTab('comment')}
+          >
+            Comment response
+          </button>
+        </div>
         <p className={styles.description}>{cfg.description}</p>
         <textarea
           className={styles.textarea}

@@ -60,6 +60,7 @@ export default function Home() {
   const [tagFilters, setTagFilters] = useState<TagFilters>(DEFAULT_TAG_FILTERS);
   const [onlyShowMentions, setOnlyShowMentions] = useState(false);
   const [onlyShowStarred, setOnlyShowStarred] = useState(false);
+  const [visibleToProcessIds, setVisibleToProcessIds] = useState<string[]>([]);
 
   // Load entries and tag filters from localStorage on mount
   useEffect(() => {
@@ -232,8 +233,17 @@ export default function Home() {
         onOnlyShowMentionsChange={handleOnlyShowMentionsChange}
         onlyShowStarred={onlyShowStarred}
         onOnlyShowStarredChange={handleOnlyShowStarredChange}
+        visibleToProcessIds={visibleToProcessIds}
       />
-      <FeedEntries entries={entries} errors={errors} loading={loading} tagFilters={tagFilters} onlyShowMentions={onlyShowMentions} onlyShowStarred={onlyShowStarred} />
+      <FeedEntries 
+        entries={entries} 
+        errors={errors} 
+        loading={loading} 
+        tagFilters={tagFilters} 
+        onlyShowMentions={onlyShowMentions} 
+        onlyShowStarred={onlyShowStarred}
+        onToProcessIdsChange={setVisibleToProcessIds}
+      />
     </div>
   );
 }
