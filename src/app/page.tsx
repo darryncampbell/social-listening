@@ -64,6 +64,7 @@ export default function Home() {
   const [onlyShowStarred, setOnlyShowStarred] = useState(false);
   const [dateFilter, setDateFilter] = useState<DateFilterValue>(DEFAULT_DATE_FILTER);
   const [visibleToProcessIds, setVisibleToProcessIds] = useState<string[]>([]);
+  const [refetchRedditUsernamesTrigger, setRefetchRedditUsernamesTrigger] = useState(0);
 
   // Load entries and tag filters from localStorage on mount
   useEffect(() => {
@@ -248,6 +249,7 @@ export default function Home() {
         dateFilter={dateFilter}
         onDateFilterChange={handleDateFilterChange}
         visibleToProcessIds={visibleToProcessIds}
+        onRefetchRedditUsernames={() => setRefetchRedditUsernamesTrigger(t => t + 1)}
       />
       <FeedEntries 
         entries={entries} 
@@ -258,6 +260,7 @@ export default function Home() {
         onlyShowStarred={onlyShowStarred}
         dateFilter={dateFilter}
         onToProcessIdsChange={setVisibleToProcessIds}
+        refetchRedditUsernamesTrigger={refetchRedditUsernamesTrigger}
       />
     </div>
   );

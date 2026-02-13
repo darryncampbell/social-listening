@@ -113,6 +113,8 @@ interface FeedEntriesProps {
   dateFilter: DateFilterValue;
   /** Called when the list of entry IDs shown in "To Process" changes (for Ignore All modal count). */
   onToProcessIdsChange?: (ids: string[]) => void;
+  /** When this increments, refetch Reddit usernames for entries that are currently unknown. */
+  refetchRedditUsernamesTrigger?: number;
 }
 
 interface CategorizedEntries {
@@ -373,7 +375,7 @@ function categorizeEntriesFromSource(entries: RssEntry[], crossPostDescriptions:
   };
 }
 
-export default function FeedEntries({ entries, errors, loading, tagFilters, onlyShowMentions, onlyShowStarred, dateFilter, onToProcessIdsChange }: FeedEntriesProps) {
+export default function FeedEntries({ entries, errors, loading, tagFilters, onlyShowMentions, onlyShowStarred, dateFilter, onToProcessIdsChange, refetchRedditUsernamesTrigger = 0 }: FeedEntriesProps) {
   const [categorized, setCategorized] = useState<CategorizedEntries>({
     toProcess: [],
     processed: [],
@@ -469,6 +471,46 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
       cancelled = true;
     };
   }, [entries, loading]);
+
+  // Refetch Reddit usernames for entries currently showing as unknown (triggered from Actions)
+  useEffect(() => {
+    if (refetchRedditUsernamesTrigger === 0 || entries.length === 0) return;
+
+    const redditUrls = entries
+      .filter(entry => entry.link && isRedditUrl(entry.link))
+      .map(entry => entry.link!);
+    const unknownUrls = redditUrls.filter(
+      url => {
+        const author = redditAuthors.get(url);
+        return !author || author === 'Unknown';
+      }
+    );
+    if (unknownUrls.length === 0) return;
+
+    let cancelled = false;
+
+    const fetchAuthors = async () => {
+      for (const url of unknownUrls) {
+        if (cancelled) break;
+        try {
+          const response = await fetch(`/api/reddit-author?url=${encodeURIComponent(url)}`);
+          if (response.status === 429) break;
+          if (response.ok) {
+            const data = await response.json();
+            if (data.author) {
+              setCachedAuthor(url, data.author);
+              setRedditAuthors(prev => new Map([...prev, [url, data.author]]));
+            }
+          }
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (error) {
+          console.error('Error fetching Reddit author for', url, error);
+        }
+      }
+    };
+    fetchAuthors();
+    return () => { cancelled = true; };
+  }, [refetchRedditUsernamesTrigger]);
 
   // Toggle cross-post highlight
   const toggleCrossPostHighlight = useCallback((description: string) => {

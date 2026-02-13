@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash, faChevronDown, faChevronRight, faRss, faGlobe, faBullhorn, faBan, faStar, faCircleMinus, faFileExport, faFileImport } from '@fortawesome/free-solid-svg-icons';
+import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash, faChevronDown, faChevronRight, faRss, faGlobe, faBullhorn, faBan, faStar, faCircleMinus, faFileExport, faFileImport, faRotateRight } from '@fortawesome/free-solid-svg-icons';
 import styles from './StatusPane.module.css';
 import PromptModal from './PromptModal';
 import ConfirmModal from './ConfirmModal';
@@ -42,9 +42,11 @@ interface StatusPaneProps {
   onDateFilterChange: (value: DateFilterValue) => void;
   /** IDs of entries currently shown in the "To Process" section (same as section count). */
   visibleToProcessIds: string[];
+  /** Trigger a refetch of Reddit usernames for entries currently showing as unknown. */
+  onRefetchRedditUsernames?: () => void;
 }
 
-export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, onTagFiltersChange, entries, onlyShowMentions, onOnlyShowMentionsChange, onlyShowStarred, onOnlyShowStarredChange, dateFilter, onDateFilterChange, visibleToProcessIds }: StatusPaneProps) {
+export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, onTagFiltersChange, entries, onlyShowMentions, onOnlyShowMentionsChange, onlyShowStarred, onOnlyShowStarredChange, dateFilter, onDateFilterChange, visibleToProcessIds, onRefetchRedditUsernames }: StatusPaneProps) {
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [externalSources, setExternalSources] = useState<ExternalSource[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
@@ -708,6 +710,19 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
                   <FontAwesomeIcon icon={faCircleMinus} />
                   <span>Unstar all</span>
                 </button>
+                {onRefetchRedditUsernames && (
+                  <button
+                    type="button"
+                    className={styles.actionsOption}
+                    onClick={() => {
+                      setActionsDropdownOpen(false);
+                      onRefetchRedditUsernames();
+                    }}
+                  >
+                    <FontAwesomeIcon icon={faRotateRight} />
+                    <span>Refetch Reddit Usernames</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
