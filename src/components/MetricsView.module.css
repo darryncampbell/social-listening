@@ -1,12 +1,175 @@
 .metricsArea {
   padding: 1.5rem;
   background: var(--bg-tertiary);
-  border: 1px dashed var(--border);
+  border: 1px solid var(--border);
   border-radius: 8px;
   min-height: 120px;
 }
 
-.metricsPlaceholder {
+.redditBreakdown {
+  margin: 0;
+}
+
+.breakdownTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 1rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.breakdownBlock {
+  margin-bottom: 1.25rem;
+}
+
+.breakdownBlock:last-child {
+  margin-bottom: 0;
+}
+
+.breakdownSubtitle {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0 0 0.5rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.breakdownEmpty {
   font-size: 0.875rem;
   color: var(--text-muted);
+  margin: 0;
+}
+
+.breakdownList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.breakdownListByAuthors {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .breakdownListByAuthors {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.breakdownListBySubreddit {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .breakdownListBySubreddit {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 900px) {
+  .breakdownListBySubreddit {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.breakdownRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0;
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.breakdownRow:last-child {
+  border-bottom: none;
+}
+
+.breakdownLink {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.breakdownLink:hover {
+  text-decoration: underline;
+}
+
+.breakdownCount {
+  font-weight: 600;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.commentPostRow {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.commentPostItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.commentPostLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.commentPostValue {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.authorRecognized {
+  font-weight: 700;
+  color: #f59e0b;
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.authorRecognized:hover {
+  opacity: 0.85;
+}
+
+.crownIconLeft {
+  margin-right: 0.25rem;
+  color: #f59e0b;
+  -webkit-text-fill-color: #f59e0b;
+  filter: drop-shadow(0 1px 2px rgba(245, 158, 11, 0.3));
+}
+
+.crownIconRight {
+  margin-left: 0.25rem;
+  color: #f59e0b;
+  -webkit-text-fill-color: #f59e0b;
+  filter: drop-shadow(0 1px 2px rgba(245, 158, 11, 0.3));
+}
+
+.authorRealName {
+  font-weight: 500;
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  -webkit-text-fill-color: inherit;
 }

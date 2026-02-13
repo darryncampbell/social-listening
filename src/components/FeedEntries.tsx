@@ -73,14 +73,7 @@ function getDaySuffix(day: number): string {
   }
 }
 
-/**
- * Detect if an entry is a Reddit comment based on URL pattern
- * Reddit comment URLs contain 'reddit.com' and '/c/'
- */
-function isRedditComment(url: string): boolean {
-  if (!url) return false;
-  return url.includes('reddit.com') && url.includes('/c/');
-}
+import { isRedditComment, getRedditSubreddit } from '@/utils/redditUtils';
 
 /**
  * Extract the parent article ID from a Reddit URL
@@ -104,22 +97,6 @@ function getRedditArticleUrl(url: string): string | null {
   // Match everything up to and including /comments/ARTICLE_ID/
   const match = url.match(/(.*\/comments\/[a-zA-Z0-9]+\/)/);
   return match ? match[1] : null;
-}
-
-/**
- * Extract subreddit name and URL from a Reddit URL.
- * Example: https://www.reddit.com/r/automation/comments/1qtvhsu/...
- * Returns: { name: 'r/automation', url: 'https://www.reddit.com/r/automation/' }
- */
-function getRedditSubreddit(url: string): { name: string; url: string } | null {
-  if (!url || !url.includes('reddit.com')) return null;
-  const match = url.match(/reddit\.com\/r\/([^/]+)/);
-  if (!match) return null;
-  const subredditName = match[1];
-  return {
-    name: `r/${subredditName}`,
-    url: `https://www.reddit.com/r/${subredditName}/`,
-  };
 }
 
 import { TagFilters, getFeedFilterState } from '@/utils/tagFilter';
@@ -693,7 +670,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
 
       <section id="metrics" className={styles.section}>
         <h3 className={styles.sectionTitle}>Metrics</h3>
-        <MetricsView />
+        <MetricsView entries={entries} redditAuthors={redditAuthors} recognizedUsers={recognizedUsers} interest={interest} />
       </section>
     </div>
   );
