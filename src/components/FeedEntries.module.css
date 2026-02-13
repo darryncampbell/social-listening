@@ -437,6 +437,25 @@
   border-left: 1px solid var(--border);
 }
 
+.entrySubreddit {
+  margin-bottom: 0.5rem;
+}
+
+.entrySubredditLink {
+  display: inline-block;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 0.25rem 0;
+  transition: color 0.15s ease;
+}
+
+.entrySubredditLink:hover {
+  color: var(--accent-hover, #0096b8);
+  text-decoration: underline;
+}
+
 .entryTitle {
   font-size: 1.125rem;
   font-weight: 600;

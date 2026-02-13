@@ -106,6 +106,22 @@ function getRedditArticleUrl(url: string): string | null {
   return match ? match[1] : null;
 }
 
+/**
+ * Extract subreddit name and URL from a Reddit URL.
+ * Example: https://www.reddit.com/r/automation/comments/1qtvhsu/...
+ * Returns: { name: 'r/automation', url: 'https://www.reddit.com/r/automation/' }
+ */
+function getRedditSubreddit(url: string): { name: string; url: string } | null {
+  if (!url || !url.includes('reddit.com')) return null;
+  const match = url.match(/reddit\.com\/r\/([^/]+)/);
+  if (!match) return null;
+  const subredditName = match[1];
+  return {
+    name: `r/${subredditName}`,
+    url: `https://www.reddit.com/r/${subredditName}/`,
+  };
+}
+
 import { TagFilters, getFeedFilterState } from '@/utils/tagFilter';
 
 interface FeedEntriesProps {
@@ -1076,7 +1092,21 @@ function EntryRow({ entry, status, onAction, onStarToggle, isStarred, crossPostD
               <span className={styles.entrySiteName}>{entry.og.ogSiteName}</span>
             )}
           </div>
-          
+          {entry.link && (() => {
+            const subreddit = getRedditSubreddit(entry.link!);
+            return subreddit ? (
+              <div className={styles.entrySubreddit}>
+                <a
+                  href={subreddit.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.entrySubredditLink}
+                >
+                  {subreddit.name}
+                </a>
+              </div>
+            ) : null;
+          })()}
           <h4 className={styles.entryTitle}>
             {displayTitle}
             {entry.link && (
