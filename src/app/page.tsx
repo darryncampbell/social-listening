@@ -6,9 +6,11 @@ import FeedEntries from '@/components/FeedEntries';
 import { RssEntry, fetchOgData } from '@/utils/rssParser';
 import { saveEntries, loadEntries } from '@/utils/entryStorage';
 import { TagFilters, DEFAULT_TAG_FILTERS } from '@/utils/tagFilter';
+import { DateFilterValue, DEFAULT_DATE_FILTER, parseDateFilterValue } from '@/utils/dateFilter';
 import styles from './page.module.css';
 
 const TAG_FILTERS_STORAGE_KEY = 'social-listening-tag-filters';
+const DATE_FILTER_STORAGE_KEY = 'social-listening-date-filter';
 
 /**
  * Deduplicate entries by URL, keeping the entry with the most recent date.
@@ -60,6 +62,7 @@ export default function Home() {
   const [tagFilters, setTagFilters] = useState<TagFilters>(DEFAULT_TAG_FILTERS);
   const [onlyShowMentions, setOnlyShowMentions] = useState(false);
   const [onlyShowStarred, setOnlyShowStarred] = useState(false);
+  const [dateFilter, setDateFilter] = useState<DateFilterValue>(DEFAULT_DATE_FILTER);
   const [visibleToProcessIds, setVisibleToProcessIds] = useState<string[]>([]);
 
   // Load entries and tag filters from localStorage on mount
@@ -121,6 +124,10 @@ export default function Home() {
       setOnlyShowStarred(true);
     }
     
+    // Load date filter
+    const storedDateFilter = localStorage.getItem(DATE_FILTER_STORAGE_KEY);
+    setDateFilter(parseDateFilterValue(storedDateFilter));
+    
     setMounted(true);
   }, []);
 
@@ -142,6 +149,11 @@ export default function Home() {
   const handleOnlyShowStarredChange = useCallback((enabled: boolean) => {
     setOnlyShowStarred(enabled);
     localStorage.setItem(ONLY_SHOW_STARRED_STORAGE_KEY, enabled ? 'true' : 'false');
+  }, []);
+
+  const handleDateFilterChange = useCallback((value: DateFilterValue) => {
+    setDateFilter(value);
+    localStorage.setItem(DATE_FILTER_STORAGE_KEY, value);
   }, []);
 
   // Fetch OG data for entries that don't have it yet
@@ -233,6 +245,8 @@ export default function Home() {
         onOnlyShowMentionsChange={handleOnlyShowMentionsChange}
         onlyShowStarred={onlyShowStarred}
         onOnlyShowStarredChange={handleOnlyShowStarredChange}
+        dateFilter={dateFilter}
+        onDateFilterChange={handleDateFilterChange}
         visibleToProcessIds={visibleToProcessIds}
       />
       <FeedEntries 
@@ -242,6 +256,7 @@ export default function Home() {
         tagFilters={tagFilters} 
         onlyShowMentions={onlyShowMentions} 
         onlyShowStarred={onlyShowStarred}
+        dateFilter={dateFilter}
         onToProcessIdsChange={setVisibleToProcessIds}
       />
     </div>

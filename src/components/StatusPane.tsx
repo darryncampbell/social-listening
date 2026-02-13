@@ -8,6 +8,7 @@ import PromptModal from './PromptModal';
 import ConfirmModal from './ConfirmModal';
 import { fetchAndParseFeed, RssEntry } from '@/utils/rssParser';
 import { TagFilters, TagType, ContentTagType, StatusTagType, CONTENT_TAG_LABELS, STATUS_TAG_LABELS, toggleFilterState, getFeedFilterState } from '@/utils/tagFilter';
+import { DateFilterValue, DATE_FILTER_OPTIONS } from '@/utils/dateFilter';
 import { getInterest, fetchEnvConfig, getPredefinedFeeds, getPredefinedExternalSources } from '@/utils/interestConfig';
 import { getExternalSources, ExternalSource } from '@/utils/externalSourcesConfig';
 import { SkoolPost, StackOverflowPost } from '@/app/api/scrape/route';
@@ -36,11 +37,13 @@ interface StatusPaneProps {
   onOnlyShowMentionsChange: (enabled: boolean) => void;
   onlyShowStarred: boolean;
   onOnlyShowStarredChange: (enabled: boolean) => void;
+  dateFilter: DateFilterValue;
+  onDateFilterChange: (value: DateFilterValue) => void;
   /** IDs of entries currently shown in the "To Process" section (same as section count). */
   visibleToProcessIds: string[];
 }
 
-export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, onTagFiltersChange, entries, onlyShowMentions, onOnlyShowMentionsChange, onlyShowStarred, onOnlyShowStarredChange, visibleToProcessIds }: StatusPaneProps) {
+export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, onTagFiltersChange, entries, onlyShowMentions, onOnlyShowMentionsChange, onlyShowStarred, onOnlyShowStarredChange, dateFilter, onDateFilterChange, visibleToProcessIds }: StatusPaneProps) {
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [externalSources, setExternalSources] = useState<ExternalSource[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
@@ -494,15 +497,15 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
           </div>
           <div className={styles.filterWrapper} ref={filterRef}>
             <button
-              className={`${styles.filterButton} ${(activeFilterCount > 0 || onlyShowMentions || onlyShowStarred) ? styles.filterActive : ''}`}
+              className={`${styles.filterButton} ${(activeFilterCount > 0 || onlyShowMentions || onlyShowStarred || dateFilter !== 'all') ? styles.filterActive : ''}`}
               onClick={() => setFilterOpen(!filterOpen)}
               title="Filter by tags"
             >
               <FontAwesomeIcon icon={faFilter} />
               <span>Filter</span>
-              {(activeFilterCount > 0 || onlyShowMentions || onlyShowStarred) && (
+              {(activeFilterCount > 0 || onlyShowMentions || onlyShowStarred || dateFilter !== 'all') && (
                 <span className={styles.filterBadge}>
-                  {activeFilterCount + (onlyShowMentions ? 1 : 0) + (onlyShowStarred ? 1 : 0)}
+                  {activeFilterCount + (onlyShowMentions ? 1 : 0) + (onlyShowStarred ? 1 : 0) + (dateFilter !== 'all' ? 1 : 0)}
                 </span>
               )}
             </button>
@@ -551,6 +554,21 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
                     </span>
                   </button>
                 ))}
+                <div className={styles.filterHeader}>Filter by date</div>
+                <div className={styles.filterDateRow}>
+                  <select
+                    className={styles.filterDateSelect}
+                    value={dateFilter}
+                    onChange={(e) => onDateFilterChange(e.target.value as DateFilterValue)}
+                    aria-label="Filter by date"
+                  >
+                    {DATE_FILTER_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <button
                   type="button"
                   className={styles.filterAdvancedToggle}

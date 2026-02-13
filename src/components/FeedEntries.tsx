@@ -123,6 +123,7 @@ function getRedditSubreddit(url: string): { name: string; url: string } | null {
 }
 
 import { TagFilters, getFeedFilterState } from '@/utils/tagFilter';
+import { DateFilterValue, getDateFilterCutoff } from '@/utils/dateFilter';
 
 interface FeedEntriesProps {
   entries: RssEntry[];
@@ -131,6 +132,7 @@ interface FeedEntriesProps {
   tagFilters: TagFilters;
   onlyShowMentions: boolean;
   onlyShowStarred: boolean;
+  dateFilter: DateFilterValue;
   /** Called when the list of entry IDs shown in "To Process" changes (for Ignore All modal count). */
   onToProcessIdsChange?: (ids: string[]) => void;
 }
@@ -393,7 +395,7 @@ function categorizeEntriesFromSource(entries: RssEntry[], crossPostDescriptions:
   };
 }
 
-export default function FeedEntries({ entries, errors, loading, tagFilters, onlyShowMentions, onlyShowStarred, onToProcessIdsChange }: FeedEntriesProps) {
+export default function FeedEntries({ entries, errors, loading, tagFilters, onlyShowMentions, onlyShowStarred, dateFilter, onToProcessIdsChange }: FeedEntriesProps) {
   const [categorized, setCategorized] = useState<CategorizedEntries>({
     toProcess: [],
     processed: [],
@@ -523,6 +525,15 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
       entriesToFilter = entriesToFilter.filter(entry => starredIds.has(entry.id));
     }
     
+    // Apply date filter if not "all-time"
+    const dateCutoff = getDateFilterCutoff(dateFilter);
+    if (dateCutoff !== null) {
+      entriesToFilter = entriesToFilter.filter(entry => {
+        const entryTime = getEntryDate(entry);
+        return entryTime >= dateCutoff;
+      });
+    }
+    
     // Check if any static filters are hidden
     const hasStaticFilter = Object.entries(tagFilters)
       .filter(([key]) => key !== 'feeds')
@@ -572,7 +583,7 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
       
       return true;
     });
-  }, [entries, tagFilters, interest, crossPostDescriptions, onlyShowMentions, onlyShowStarred, starredIds]);
+  }, [entries, tagFilters, interest, crossPostDescriptions, onlyShowMentions, onlyShowStarred, starredIds, dateFilter]);
 
   const recategorize = useCallback(() => {
     setCategorized(categorizeEntriesFromSource(filteredEntries, crossPostDescriptions));
