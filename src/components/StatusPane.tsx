@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash, faChevronDown, faChevronRight, faRss, faGlobe, faBullhorn, faBan, faStar, faCircleMinus } from '@fortawesome/free-solid-svg-icons';
+import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash, faChevronDown, faChevronRight, faRss, faGlobe, faBullhorn, faBan, faStar, faCircleMinus, faFileExport, faFileImport } from '@fortawesome/free-solid-svg-icons';
 import styles from './StatusPane.module.css';
 import PromptModal from './PromptModal';
 import ConfirmModal from './ConfirmModal';
@@ -15,6 +15,7 @@ import { SkoolPost, StackOverflowPost } from '@/app/api/scrape/route';
 import { loadEntries } from '@/utils/entryStorage';
 import { markAsIgnored } from '@/utils/entryState';
 import { getStarredEntryIds, clearAllStarred } from '@/utils/starredStorage';
+import { downloadExportedEntries, importEntries } from '@/utils/exportImportStorage';
 
 const FEEDS_STORAGE_KEY = 'social-listening-feeds';
 const SYNC_TIME_STORAGE_KEY = 'social-listening-last-sync';
@@ -63,6 +64,7 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
   const filterRef = useRef<HTMLDivElement>(null);
   const syncRef = useRef<HTMLDivElement>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
 
   // Extract unique feed titles from entries
   const uniqueFeedTitles = useMemo(() => {
@@ -492,8 +494,56 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
                   <span>Sync External Sites Only</span>
                   <span className={styles.syncOptionCount}>({externalSources.length})</span>
                 </button>
+                <div className={styles.syncDropdownDivider} />
+                <button
+                  type="button"
+                  className={styles.syncOption}
+                  onClick={() => {
+                    setSyncDropdownOpen(false);
+                    downloadExportedEntries();
+                  }}
+                >
+                  <FontAwesomeIcon icon={faFileExport} />
+                  <span>Export data</span>
+                </button>
+                <button
+                  type="button"
+                  className={styles.syncOption}
+                  onClick={() => {
+                    setSyncDropdownOpen(false);
+                    importFileInputRef.current?.click();
+                  }}
+                >
+                  <FontAwesomeIcon icon={faFileImport} />
+                  <span>Import data</span>
+                </button>
               </div>
             )}
+            <input
+              ref={importFileInputRef}
+              type="file"
+              accept=".json,application/json"
+              className={styles.hiddenFileInput}
+              aria-hidden
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => {
+                  try {
+                    const text = reader.result as string;
+                    const data = JSON.parse(text) as { entries?: unknown[] } | unknown[];
+                    const entries = Array.isArray(data) ? data : (data?.entries ?? []);
+                    importEntries({ entries });
+                    window.location.reload();
+                  } catch {
+                    console.error('Failed to parse import file');
+                  }
+                };
+                reader.readAsText(file);
+              }}
+            />
           </div>
           <div className={styles.filterWrapper} ref={filterRef}>
             <button
