@@ -1,0 +1,12 @@
+.metricsArea {
+  padding: 1.5rem;
+  background: var(--bg-tertiary);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  min-height: 120px;
+}
+
+.metricsPlaceholder {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}

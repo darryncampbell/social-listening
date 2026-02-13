@@ -124,6 +124,7 @@ function getRedditSubreddit(url: string): { name: string; url: string } | null {
 
 import { TagFilters, getFeedFilterState } from '@/utils/tagFilter';
 import { DateFilterValue, getDateFilterCutoff } from '@/utils/dateFilter';
+import MetricsView from './MetricsView';
 
 interface FeedEntriesProps {
   entries: RssEntry[];
@@ -622,10 +623,6 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
     );
   }
 
-  if (entries.length === 0 && errors.length === 0) {
-    return null;
-  }
-
   return (
     <div className={styles.container}>
       {errors.length > 0 && (
@@ -639,6 +636,8 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
         </div>
       )}
 
+      {(entries.length > 0 || errors.length > 0) && (
+        <>
       <EntryTable
         id="to-process"
         title="To Process"
@@ -689,6 +688,13 @@ export default function FeedEntries({ entries, errors, loading, tagFilters, only
         recognizedUsers={recognizedUsers}
         tagFilters={tagFilters}
       />
+        </>
+      )}
+
+      <section id="metrics" className={styles.section}>
+        <h3 className={styles.sectionTitle}>Metrics</h3>
+        <MetricsView />
+      </section>
     </div>
   );
 }
