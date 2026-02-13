@@ -1101,27 +1101,33 @@ function EntryRow({ entry, status, onAction, onStarToggle, isStarred, crossPostD
               </span>
             )}
             {redditAuthor && (() => {
+              const isUnknown = redditAuthor === 'Unknown';
               const recognizedUser = findUserRecognized(redditAuthor, recognizedUsers);
               const isRecognized = recognizedUser !== null;
               const realName = recognizedUser?.realName || '';
-              
+              const label = isUnknown ? 'u/Unknown (try refreshing Reddit names)' : `u/${redditAuthor}`;
+
               return (
                 <span className={styles.entryAuthor}>
-                  by <a 
-                    href={`https://www.reddit.com/user/${redditAuthor}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`${styles.entryAuthorLink} ${isRecognized ? styles.entryAuthorRecognized : ''}`}
-                  >
-                    {isRecognized && (
-                      <FontAwesomeIcon icon={faCrown} className={styles.crownIconLeft} />
-                    )}
-                    u/{redditAuthor}
-                    {realName && <span className={styles.authorRealName}> ({realName})</span>}
-                    {isRecognized && (
-                      <FontAwesomeIcon icon={faCrown} className={styles.crownIconRight} />
-                    )}
-                  </a>
+                  by {isUnknown ? (
+                    <span className={styles.entryAuthorLink}>{label}</span>
+                  ) : (
+                    <a 
+                      href={`https://www.reddit.com/user/${redditAuthor}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`${styles.entryAuthorLink} ${isRecognized ? styles.entryAuthorRecognized : ''}`}
+                    >
+                      {isRecognized && (
+                        <FontAwesomeIcon icon={faCrown} className={styles.crownIconLeft} />
+                      )}
+                      {label}
+                      {realName && <span className={styles.authorRealName}> ({realName})</span>}
+                      {isRecognized && (
+                        <FontAwesomeIcon icon={faCrown} className={styles.crownIconRight} />
+                      )}
+                    </a>
+                  )}
                 </span>
               );
             })()}

@@ -177,23 +177,29 @@ export default function MetricsView({
                 const realName = recognized?.realName ?? '';
                 return (
                   <li key={username} className={styles.breakdownRow}>
-                    <a
-                      href={`https://www.reddit.com/user/${username}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`${styles.breakdownLink} ${isRecognized ? styles.authorRecognized : ''}`}
-                    >
-                      {isRecognized && (
-                        <FontAwesomeIcon icon={faCrown} className={styles.crownIconLeft} />
-                      )}
-                      u/{username}
-                      {realName && (
-                        <span className={styles.authorRealName}> ({realName})</span>
-                      )}
-                      {isRecognized && (
-                        <FontAwesomeIcon icon={faCrown} className={styles.crownIconRight} />
-                      )}
-                    </a>
+                    {username === 'Unknown' ? (
+                      <span className={styles.breakdownLink}>
+                        u/Unknown (try refreshing Reddit names)
+                      </span>
+                    ) : (
+                      <a
+                        href={`https://www.reddit.com/user/${username}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`${styles.breakdownLink} ${isRecognized ? styles.authorRecognized : ''}`}
+                      >
+                        {isRecognized && (
+                          <FontAwesomeIcon icon={faCrown} className={styles.crownIconLeft} />
+                        )}
+                        u/{username}
+                        {realName && (
+                          <span className={styles.authorRealName}> ({realName})</span>
+                        )}
+                        {isRecognized && (
+                          <FontAwesomeIcon icon={faCrown} className={styles.crownIconRight} />
+                        )}
+                      </a>
+                    )}
                     <span className={styles.breakdownCount}>{count}</span>
                   </li>
                 );
