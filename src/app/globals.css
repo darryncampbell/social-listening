@@ -6,7 +6,7 @@
   box-sizing: border-box;
 }
 
-/* Dark theme (default) - LiveKit style */
+/* Dark theme (default) */
 :root,
 [data-theme='dark'] {
   --bg-primary: #111111;
@@ -39,7 +39,7 @@
   color-scheme: dark;
 }
 
-/* Light theme - LiveKit style */
+/* Light theme */
 [data-theme='light'] {
   --bg-primary: #ffffff;
   --bg-secondary: #f9fafb;
@@ -94,7 +94,7 @@ a {
   text-decoration: none;
 }
 
-/* Headings - LiveKit style */
+/* Headings */
 h1 {
   font-size: 1.75rem;
   font-weight: 600;

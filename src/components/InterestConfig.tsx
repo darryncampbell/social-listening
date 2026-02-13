@@ -131,7 +131,7 @@ export default function InterestConfig() {
           type="text"
           value={interest}
           onChange={handleChange}
-          placeholder="e.g., LiveKit, Acme Corp"
+          placeholder="e.g., Acme Corp, Jane Smith"
           className={`${styles.input} ${isEnvOverridden ? styles.inputDisabled : ''}`}
           disabled={isEnvOverridden}
           readOnly={isEnvOverridden}

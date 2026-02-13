@@ -843,6 +843,7 @@ function EntryRow({ entry, status, onAction, onStarToggle, isStarred, crossPostD
           prompt: prompt,
           title: displayTitle,
           description: displayDescription,
+          interest: interest,
         }),
       });
       
