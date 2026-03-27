@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash, faChevronDown, faChevronRight, faRss, faGlobe, faBullhorn, faBan, faStar, faCircleMinus, faFileExport, faFileImport, faRotateRight } from '@fortawesome/free-solid-svg-icons';
+import { faSync, faExclamationTriangle, faFilter, faEye, faEyeSlash, faChevronDown, faChevronRight, faRss, faGlobe, faBullhorn, faBan, faStar, faCircleMinus, faFileExport, faFileImport, faRotateRight, faTrashCan } from '@fortawesome/free-solid-svg-icons';
 import styles from './StatusPane.module.css';
 import PromptModal from './PromptModal';
 import ConfirmModal from './ConfirmModal';
@@ -12,7 +12,7 @@ import { DateFilterValue, DATE_FILTER_OPTIONS } from '@/utils/dateFilter';
 import { getInterest, fetchEnvConfig, getPredefinedFeeds, getPredefinedExternalSources } from '@/utils/interestConfig';
 import { getExternalSources, ExternalSource } from '@/utils/externalSourcesConfig';
 import { SkoolPost, StackOverflowPost } from '@/app/api/scrape/route';
-import { loadEntries } from '@/utils/entryStorage';
+import { loadEntries, saveEntries } from '@/utils/entryStorage';
 import { markAsIgnored } from '@/utils/entryState';
 import { getStarredEntryIds, clearAllStarred } from '@/utils/starredStorage';
 import { downloadExportedEntries, importEntries } from '@/utils/exportImportStorage';
@@ -63,6 +63,7 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
   const [interest, setInterest] = useState('');
   const [showIgnoreAllModal, setShowIgnoreAllModal] = useState(false);
   const [showUnstarAllModal, setShowUnstarAllModal] = useState(false);
+  const [showDeleteNonMentionsModal, setShowDeleteNonMentionsModal] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
   const syncRef = useRef<HTMLDivElement>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
@@ -723,6 +724,19 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
                     <span>Refetch Reddit Usernames</span>
                   </button>
                 )}
+                {interest && (
+                  <button
+                    type="button"
+                    className={styles.actionsOption}
+                    onClick={() => {
+                      setActionsDropdownOpen(false);
+                      setShowDeleteNonMentionsModal(true);
+                    }}
+                  >
+                    <FontAwesomeIcon icon={faTrashCan} />
+                    <span>Delete entries not mentioning {interest}</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -784,6 +798,33 @@ export default function StatusPane({ onSyncComplete, onSyncStart, tagFilters, on
             }}
             onCancel={() => setShowUnstarAllModal(false)}
             confirmText="Unstar all"
+            cancelText="Cancel"
+          />
+        );
+      })()}
+      {showDeleteNonMentionsModal && (() => {
+        const interestLower = interest.toLowerCase();
+        const storedEntries = loadEntries();
+        const mentionsInterest = (e: RssEntry) => {
+          const title = (e.og?.ogTitle || e.title || '').toLowerCase();
+          const description = (e.og?.ogDescription || e.description || '').toLowerCase();
+          return title.includes(interestLower) || description.includes(interestLower);
+        };
+        const keepCount = storedEntries.filter(mentionsInterest).length;
+        const deleteCount = storedEntries.length - keepCount;
+        return (
+          <ConfirmModal
+            title={`Delete entries not mentioning ${interest}`}
+            message={`This will permanently delete ${deleteCount} cached entr${deleteCount === 1 ? 'y' : 'ies'} that don't mention "${interest}" in their title or description, keeping ${keepCount}. This frees up browser storage space. This action cannot be undone.`}
+            onConfirm={() => {
+              const all = loadEntries();
+              const filtered = all.filter(mentionsInterest);
+              saveEntries(filtered);
+              setShowDeleteNonMentionsModal(false);
+              window.location.reload();
+            }}
+            onCancel={() => setShowDeleteNonMentionsModal(false)}
+            confirmText="Delete"
             cancelText="Cancel"
           />
         );
